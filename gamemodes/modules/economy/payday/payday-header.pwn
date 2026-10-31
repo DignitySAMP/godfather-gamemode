@@ -1,0 +1,6 @@
+#include "modules/economy/payday/payday-data.pwn"
+#include "modules/economy/payday/payday-tax.pwn"
+#include "modules/economy/payday/payday-accrual.pwn"
+#include "modules/economy/payday/payday-run.pwn"
+#include "modules/economy/payday/payday-clock.pwn"
+#include "modules/economy/payday/payday-main.pwn"

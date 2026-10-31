@@ -1,0 +1,5 @@
+#include "modules/phone/phone-data.pwn"
+#include "modules/phone/phone-ring.pwn"
+#include "modules/phone/phone-calls.pwn"
+#include "modules/phone/phone-commands.pwn"
+#include "modules/phone/phone-main.pwn"

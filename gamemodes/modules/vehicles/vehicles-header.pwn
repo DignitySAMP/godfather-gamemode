@@ -1,0 +1,5 @@
+#include "modules/vehicles/world/world-header.pwn"
+#include "modules/vehicles/owned/owned-header.pwn"
+#include "modules/vehicles/rental/rental-header.pwn"
+#include "modules/vehicles/fuel/fuel-header.pwn"
+#include "modules/vehicles/driveby/driveby-header.pwn"

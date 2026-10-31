@@ -1,0 +1,5 @@
+#include "modules/economy/economy-common.pwn"
+#include "modules/economy/bank/bank-header.pwn"
+#include "modules/economy/cash/cash-header.pwn"
+#include "modules/economy/payday/payday-header.pwn"
+#include "modules/economy/lotto/lotto-header.pwn"

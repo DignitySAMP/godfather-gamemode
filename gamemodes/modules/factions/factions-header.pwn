@@ -1,0 +1,8 @@
+#include "modules/factions/factions-data.pwn"
+#include "modules/factions/factions-spawn.pwn"
+#include "modules/factions/factions-charselect.pwn"
+#include "modules/factions/factions-commands.pwn"
+#include "modules/factions/factions-links.pwn"
+#include "modules/factions/factions-main.pwn"
+#include "modules/factions/medics/medics-header.pwn"
+#include "modules/factions/government/government-header.pwn"

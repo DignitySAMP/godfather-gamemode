@@ -1,0 +1,48 @@
+{
+    "name": "The Godfather",
+    "announce": false,
+    "max_players": 100,
+    "max_bots": 10,
+    "rcon": {
+        "allow_teleport": true,
+        "enable": true,
+        "password": "set-at-boot"
+    },
+    "pawn": {
+        "main_scripts": [
+            "godfather 1"
+        ],
+        "legacy_plugins": [
+            "crashdetect",
+            "PawnPlus",
+            "streamer",
+            "mysql",
+            "samp_bcrypt"
+        ]
+    },
+    "network": {
+        "acks_limit": 10000,
+        "allow_037_clients": true
+    },
+    "sleep": 5.0,
+    "use_dyn_ticks": true,
+    "website": "",
+    "language": "English",
+    "game": {
+        "lag_compensation_mode": 1,
+        "map": "San Andreas",
+        "mode": "The Godfather"
+    },
+    "artwork": {
+        "enable": false
+    },
+    "logo": "",
+    "discord": {
+        "invite": ""
+    },
+    "chat_input_filter": true,
+    "enable_query": true,
+    "logging": {
+        "log_chat": false
+    }
+}

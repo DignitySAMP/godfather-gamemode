@@ -1,0 +1,5 @@
+#include "modules/vehicles/fuel/fuel-data.pwn"
+#include "modules/vehicles/fuel/fuel-station.pwn"
+#include "modules/vehicles/fuel/fuel-ticker.pwn"
+#include "modules/vehicles/fuel/fuel-commands.pwn"
+#include "modules/vehicles/fuel/fuel-main.pwn"

@@ -1,0 +1,6 @@
+#include "modules/property/doors/doors-data.pwn"
+#include "modules/property/doors/doors-fixed.pwn"
+#include "modules/property/doors/doors-sa.pwn"
+#include "modules/property/doors/doors-commands.pwn"
+#include "modules/property/doors/doors-leak.pwn"
+#include "modules/property/doors/doors-main.pwn"

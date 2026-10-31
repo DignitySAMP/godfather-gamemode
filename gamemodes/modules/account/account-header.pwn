@@ -1,0 +1,7 @@
+#include "modules/account/account-data.pwn"
+#include "modules/account/account-stats.pwn"
+#include "modules/account/account-registration.pwn"
+#include "modules/account/account-gui.pwn"
+#include "modules/account/account-auth.pwn"
+#include "modules/account/account-commands.pwn"
+#include "modules/account/account-main.pwn"

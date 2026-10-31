@@ -1,0 +1,19 @@
+# Line-ending policy. The repo builds on Windows + macOS and deploys to Debian Linux, so files
+# that Linux executes MUST stay LF regardless of a checkout's core.autocrlf setting.
+
+# Shell scripts + Dockerfile run inside the Linux container — force LF or the shebang breaks
+# (`/usr/bin/env: 'bash\r'`).
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+entrypoint.sh text eol=lf
+
+# PowerShell is Windows-native — keep CRLF.
+*.ps1       text eol=crlf
+
+# Vendored / compiled binaries — never apply text or line-ending conversion.
+*.exe       binary
+*.dll       binary
+*.dylib     binary
+*.so        binary
+*.amx       binary
+compiler/pawncc binary

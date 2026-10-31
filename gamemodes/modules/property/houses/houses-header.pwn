@@ -1,0 +1,8 @@
+#include "modules/property/houses/houses-data.pwn"
+#include "modules/property/houses/houses-keys.pwn"
+#include "modules/property/houses/houses-levels.pwn"
+#include "modules/property/houses/houses-property.pwn"
+#include "modules/property/houses/houses-upkeep.pwn"
+#include "modules/property/houses/houses-manage.pwn"
+#include "modules/property/houses/houses-commands.pwn"
+#include "modules/property/houses/houses-main.pwn"

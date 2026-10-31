@@ -1,0 +1,5 @@
+#include "modules/families/families-data.pwn"
+#include "modules/families/families-turfs.pwn"
+#include "modules/families/families-links.pwn"
+#include "modules/families/families-commands.pwn"
+#include "modules/families/families-main.pwn"

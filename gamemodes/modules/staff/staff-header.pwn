@@ -1,0 +1,8 @@
+#include "modules/staff/staff-data.pwn"
+#include "modules/staff/staff-chat.pwn"
+#include "modules/staff/staff-moderation.pwn"
+#include "modules/staff/staff-spectate.pwn"
+#include "modules/staff/teleport/teleport-header.pwn"
+#include "modules/staff/manage/manage-header.pwn"
+#include "modules/staff/world/world-header.pwn"
+#include "modules/staff/staff-main.pwn"

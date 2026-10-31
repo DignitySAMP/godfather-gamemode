@@ -1,0 +1,5 @@
+#include "modules/property/property-common.pwn"
+#include "modules/property/doors/doors-header.pwn"
+#include "modules/property/houses/houses-header.pwn"
+#include "modules/property/business/business-header.pwn"
+#include "modules/property/shops/shops-header.pwn"

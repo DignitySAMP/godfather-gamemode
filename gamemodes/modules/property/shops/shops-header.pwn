@@ -1,0 +1,6 @@
+#include "modules/property/shops/shops-data.pwn"
+#include "modules/property/shops/shops-buy.pwn"
+#include "modules/property/shops/shops-bar.pwn"
+#include "modules/property/shops/shops-clothes.pwn"
+#include "modules/property/shops/shops-guns.pwn"
+#include "modules/property/shops/shops-main.pwn"

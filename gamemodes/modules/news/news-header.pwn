@@ -1,0 +1,6 @@
+#include "modules/news/news-data.pwn"
+#include "modules/news/news-paper.pwn"
+#include "modules/news/news-live.pwn"
+#include "modules/news/news-commands.pwn"
+#include "modules/news/news-hints.pwn"
+#include "modules/news/news-main.pwn"

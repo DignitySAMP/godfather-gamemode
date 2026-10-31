@@ -1,0 +1,5 @@
+#include "modules/vehicles/owned/owned-data.pwn"
+#include "modules/vehicles/owned/owned-gates.pwn"
+#include "modules/vehicles/owned/owned-carcheck.pwn"
+#include "modules/vehicles/owned/owned-commands.pwn"
+#include "modules/vehicles/owned/owned-main.pwn"

@@ -1,0 +1,6 @@
+#include "modules/law/law-data.pwn"
+#include "modules/law/law-wanted.pwn"
+#include "modules/law/law-jail.pwn"
+#include "modules/law/law-cuffs.pwn"
+#include "modules/law/law-commands.pwn"
+#include "modules/law/law-main.pwn"
