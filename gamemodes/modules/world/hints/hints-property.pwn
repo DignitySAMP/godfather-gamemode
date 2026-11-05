@@ -114,7 +114,7 @@ stock bool:Hints_ShowProperty(playerid)
         }
     }
 
-    for (new row = BUSINESS_FIXED_ROWS;row < BUSINESS_ROWS;row++)
+    for (new row = BUSINESS_FIXED_ROWS, rows = Business_GetRowCount();row < rows;row++)
     {
         if (Hints_ShowBusiness(playerid,Business_GetKeyOfRow(row),isTruck))
         {

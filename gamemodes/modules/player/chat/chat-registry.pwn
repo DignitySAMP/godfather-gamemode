@@ -10,7 +10,6 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define CHAT_INTERCEPTORS_MAX (24)
 #define CHAT_HANDLER_LEN (32)
 
 enum
@@ -26,9 +25,13 @@ enum
     CHAT_SLOT_PHONE = 900
 }
 
-static s_ChatHandlers[CHAT_INTERCEPTORS_MAX][CHAT_HANDLER_LEN];
-static s_ChatPriorities[CHAT_INTERCEPTORS_MAX];
-static s_ChatHandlerCount;
+enum e_CHAT_HANDLER
+{
+    E_CHAT_HANDLER_NAME[CHAT_HANDLER_LEN],
+    E_CHAT_HANDLER_PRIORITY
+}
+
+static List:s_ChatHandlers;
 static bool:s_ChatRealChat = true;
 
 forward Chat_SayDefault(playerid,const text[]);
@@ -45,6 +48,28 @@ forward Chat_SayDefault(playerid,const text[]);
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static Chat_CountHandlers()
+{
+    return list_valid(s_ChatHandlers) ? list_size(s_ChatHandlers) : 0;
+}
+
+static Chat_FindHandler(const handler[])
+{
+    new entry[e_CHAT_HANDLER];
+
+    for (new i = 0, count = Chat_CountHandlers();i < count;i++)
+    {
+        list_get_arr(s_ChatHandlers,i,entry);
+
+        if (!strcmp(entry[E_CHAT_HANDLER_NAME],handler,true))
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 stock bool:Chat_RegisterInterceptor(const handler[],priority)
 {
     if (!pawn_public_exists(handler))
@@ -53,32 +78,26 @@ stock bool:Chat_RegisterInterceptor(const handler[],priority)
         return false;
     }
 
-    for (new i = 0;i < s_ChatHandlerCount;i++)
+    if (Chat_FindHandler(handler) != -1)
     {
-        if (!strcmp(s_ChatHandlers[i],handler,true))
-        {
-            return false;
-        }
-    }
-
-    if (s_ChatHandlerCount >= CHAT_INTERCEPTORS_MAX)
-    {
-        Log_Error("chat","no room for interceptor %s: raise CHAT_INTERCEPTORS_MAX",handler);
         return false;
     }
 
-    new at = s_ChatHandlerCount;
-
-    while (at > 0 && s_ChatPriorities[at - 1] > priority)
+    if (!list_valid(s_ChatHandlers))
     {
-        strcopy(s_ChatHandlers[at],s_ChatHandlers[at - 1],CHAT_HANDLER_LEN);
-        s_ChatPriorities[at] = s_ChatPriorities[at - 1];
+        s_ChatHandlers = list_new();
+    }
+
+    new at = Chat_CountHandlers(), entry[e_CHAT_HANDLER];
+
+    while (at > 0 && list_get(s_ChatHandlers,at - 1,_:E_CHAT_HANDLER_PRIORITY) > priority)
+    {
         at--;
     }
 
-    strcopy(s_ChatHandlers[at],handler,CHAT_HANDLER_LEN);
-    s_ChatPriorities[at] = priority;
-    s_ChatHandlerCount++;
+    strcopy(entry[E_CHAT_HANDLER_NAME],handler,CHAT_HANDLER_LEN);
+    entry[E_CHAT_HANDLER_PRIORITY] = priority;
+    list_add_arr(s_ChatHandlers,entry,at);
     return true;
 }
 
@@ -94,9 +113,13 @@ Chat_RouteText(playerid,const text[])
         return 0;
     }
 
-    for (new i = 0;i < s_ChatHandlerCount;i++)
+    new entry[e_CHAT_HANDLER];
+
+    for (new i = 0;i < Chat_CountHandlers();i++)
     {
-        if (CallLocalFunction(s_ChatHandlers[i],"ds",playerid,text) != 0)
+        list_get_arr(s_ChatHandlers,i,entry);
+
+        if (CallLocalFunction(entry[E_CHAT_HANDLER_NAME],"ds",playerid,text) != 0)
         {
             return 0;
         }

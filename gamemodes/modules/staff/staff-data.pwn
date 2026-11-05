@@ -59,8 +59,7 @@ static Float:s_StaffIdlePosition[MAX_PLAYERS][6];
 static bool:s_StaffIdleHasSample[MAX_PLAYERS];
 static Float:s_StaffMark[MAX_PLAYERS][3];
 static s_StaffBanAction[STAFF_ACTION_LEN];
-static s_StaffCreatedCars[STAFF_CREATED_CARS_MAX];
-static s_StaffCreatedCount;
+static List:s_StaffCreatedCars;
 
 /**
  *      ______                                   __      __
@@ -336,34 +335,49 @@ stock bool:Staff_IdleSample(playerid)
     return isIdle;
 }
 
+static Staff_CountCreatedCars()
+{
+    return list_valid(s_StaffCreatedCars) ? list_size(s_StaffCreatedCars) : 0;
+}
+
 stock bool:Staff_TrackCreatedCar(vehicleid)
 {
-    if (s_StaffCreatedCount >= STAFF_CREATED_CARS_MAX)
+    if (Staff_CountCreatedCars() >= STAFF_CREATED_CARS_MAX)
     {
         return false;
     }
 
-    s_StaffCreatedCars[s_StaffCreatedCount++] = vehicleid;
+    if (!list_valid(s_StaffCreatedCars))
+    {
+        s_StaffCreatedCars = list_new();
+    }
+
+    list_add(s_StaffCreatedCars,vehicleid);
     return true;
 }
 
 stock bool:Staff_CreatedCarsFull()
 {
-    return s_StaffCreatedCount >= STAFF_CREATED_CARS_MAX;
+    return Staff_CountCreatedCars() >= STAFF_CREATED_CARS_MAX;
 }
 
 stock Staff_DestroyCreatedCars()
 {
-    for (new i = 0;i < s_StaffCreatedCount;i++)
+    if (!list_valid(s_StaffCreatedCars))
     {
-        if (s_StaffCreatedCars[i] != 0)
-        {
-            DestroyVehicle(s_StaffCreatedCars[i]);
-        }
-
-        s_StaffCreatedCars[i] = 0;
+        return;
     }
 
-    s_StaffCreatedCount = 0;
+    for (new i = 0, count = list_size(s_StaffCreatedCars);i < count;i++)
+    {
+        new vehicleid = list_get(s_StaffCreatedCars,i);
+
+        if (vehicleid != 0)
+        {
+            DestroyVehicle(vehicleid);
+        }
+    }
+
+    list_clear(s_StaffCreatedCars);
 }
 

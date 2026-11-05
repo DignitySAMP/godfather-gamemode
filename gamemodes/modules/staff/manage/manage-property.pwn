@@ -264,7 +264,7 @@ CMD<ADMIN_LEVEL_MANAGER>:edit(cmdid, playerid, params[])
         Manage_EditBusiness(playerid,Business_MakeSpecialKey(index),"SBiz",field,value);
     }
 
-    for (new row = BUSINESS_FIXED_ROWS;row < BUSINESS_ROWS;row++)
+    for (new row = BUSINESS_FIXED_ROWS, rows = Business_GetRowCount();row < rows;row++)
     {
         Manage_EditBusiness(playerid,Business_GetKeyOfRow(row),"Biz",field,value);
     }

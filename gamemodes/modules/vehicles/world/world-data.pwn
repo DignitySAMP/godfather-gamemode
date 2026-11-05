@@ -11,7 +11,6 @@
  *
  */
 #define VEHICLE_MAX (MAX_VEHICLES + 1)
-#define VEHICLE_KEY_MAX (511)
 #define VEHICLE_HOUSE_MAX (64)
 #define VEHICLE_NO_HOUSE (255)
 #define VEHICLE_STREET_SLOTS (14)
@@ -49,23 +48,31 @@ forward Vehicles_OnCreated(vehicleid, key);
 forward Vehicles_OnSale(playerid, shop, amount, products);
 forward Task:Vehicles_LoadWorld();
 
+enum e_VEHICLE_ROW
+{
+    E_VEHICLE_ROW_KEY,
+    E_VEHICLE_ROW_KIND,
+    E_VEHICLE_ROW_MODEL,
+    E_VEHICLE_ROW_COLOR1,
+    E_VEHICLE_ROW_COLOR2,
+    E_VEHICLE_ROW_RESPAWN,
+    E_VEHICLE_ROW_INTERIOR,
+    E_VEHICLE_ROW_CLASSES,
+    E_VEHICLE_ROW_GATES,
+    E_VEHICLE_ROW_SHOP,
+    E_VEHICLE_ROW_SLOT,
+    Float:E_VEHICLE_ROW_X,
+    Float:E_VEHICLE_ROW_Y,
+    Float:E_VEHICLE_ROW_Z,
+    Float:E_VEHICLE_ROW_ANGLE,
+    E_VEHICLE_ROW_VEHICLE
+}
+
 static s_VehicleKey[VEHICLE_MAX];
-static s_KeyVehicle[VEHICLE_KEY_MAX + 1];
+static Pool:s_VehicleRows;
+static Map:s_VehicleRowSlots;
 static s_HouseVehicle[VEHICLE_HOUSE_MAX];
 static s_VehicleHouse[VEHICLE_MAX];
-
-static s_RowUsed[VEHICLE_KEY_MAX + 1];
-static s_RowKind[VEHICLE_KEY_MAX + 1];
-static s_RowModel[VEHICLE_KEY_MAX + 1];
-static s_RowColor1[VEHICLE_KEY_MAX + 1];
-static s_RowColor2[VEHICLE_KEY_MAX + 1];
-static s_RowRespawn[VEHICLE_KEY_MAX + 1];
-static s_RowInterior[VEHICLE_KEY_MAX + 1];
-static s_RowClasses[VEHICLE_KEY_MAX + 1];
-static s_RowGates[VEHICLE_KEY_MAX + 1];
-static s_RowShop[VEHICLE_KEY_MAX + 1];
-static s_RowSlot[VEHICLE_KEY_MAX + 1];
-static Float:s_RowPos[VEHICLE_KEY_MAX + 1][4];
 
 static s_VehicleKind[VEHICLE_MAX];
 static s_VehicleClasses[VEHICLE_MAX];
@@ -97,6 +104,34 @@ static const s_StreetPool[VEHICLE_STREET_POOL] =
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static Vehicles_RowSlot(key)
+{
+    if (!map_valid(s_VehicleRowSlots) || !map_has_key(s_VehicleRowSlots, key))
+    {
+        return -1;
+    }
+
+    return map_get(s_VehicleRowSlots, key);
+}
+
+static bool:Vehicles_FetchRow(key, data[e_VEHICLE_ROW])
+{
+    new slot = Vehicles_RowSlot(key);
+
+    if (slot == -1)
+    {
+        return false;
+    }
+
+    pool_get_arr(s_VehicleRows, slot, data);
+    return true;
+}
+
+static Vehicles_StoreRowData(key, const data[e_VEHICLE_ROW])
+{
+    pool_set_arr(s_VehicleRows, Vehicles_RowSlot(key), data);
+}
+
 stock Vehicles_GetKey(vehicleid)
 {
     if (vehicleid < 1 || vehicleid > MAX_VEHICLES)
@@ -174,7 +209,9 @@ stock bool:Vehicles_IsPlane(vehicleid)
 
 stock bool:Vehicles_GetSpawnPoint(key, &Float:x, &Float:y, &Float:z, &Float:angle)
 {
-    if (key < 1 || key > VEHICLE_KEY_MAX || !s_RowUsed[key])
+    new data[e_VEHICLE_ROW];
+
+    if (!Vehicles_FetchRow(key, data))
     {
         x = 0.0;
         y = 0.0;
@@ -183,24 +220,26 @@ stock bool:Vehicles_GetSpawnPoint(key, &Float:x, &Float:y, &Float:z, &Float:angl
         return false;
     }
 
-    x = s_RowPos[key][0];
-    y = s_RowPos[key][1];
-    z = s_RowPos[key][2];
-    angle = s_RowPos[key][3];
+    x = data[E_VEHICLE_ROW_X];
+    y = data[E_VEHICLE_ROW_Y];
+    z = data[E_VEHICLE_ROW_Z];
+    angle = data[E_VEHICLE_ROW_ANGLE];
     return true;
 }
 
 stock Vehicles_GetRowColors(key, &color1, &color2)
 {
-    if (key < 1 || key > VEHICLE_KEY_MAX || !s_RowUsed[key])
+    new data[e_VEHICLE_ROW];
+
+    if (!Vehicles_FetchRow(key, data))
     {
         color1 = -1;
         color2 = -1;
         return false;
     }
 
-    color1 = s_RowColor1[key];
-    color2 = s_RowColor2[key];
+    color1 = data[E_VEHICLE_ROW_COLOR1];
+    color2 = data[E_VEHICLE_ROW_COLOR2];
     return true;
 }
 
@@ -241,21 +280,22 @@ stock bool:Vehicles_SetHouseCar(houseid, vehicleid)
 
 stock bool:Vehicles_SetHouseCarStyle(houseid, model, color1, color2)
 {
-    new key = houseid + 1;
+    new key = houseid + 1, data[e_VEHICLE_ROW];
 
-    if (houseid < 0 || houseid >= VEHICLE_HOUSE_MAX || key > VEHICLE_KEY_MAX || !s_RowUsed[key] || s_RowKind[key] != VEHICLE_KIND_HOUSE)
+    if (houseid < 0 || houseid >= VEHICLE_HOUSE_MAX || !Vehicles_FetchRow(key, data) || data[E_VEHICLE_ROW_KIND] != VEHICLE_KIND_HOUSE)
     {
         return false;
     }
 
     if (model >= 400 && model <= 611)
     {
-        s_RowModel[key] = model;
+        data[E_VEHICLE_ROW_MODEL] = model;
     }
 
-    s_RowColor1[key] = color1;
-    s_RowColor2[key] = color2;
-    mysql_tquery_s(g_Mysql, str_format("UPDATE vehicles SET model = %d, color1 = %d, color2 = %d WHERE id = %d", s_RowModel[key], color1, color2, key));
+    data[E_VEHICLE_ROW_COLOR1] = color1;
+    data[E_VEHICLE_ROW_COLOR2] = color2;
+    Vehicles_StoreRowData(key, data);
+    mysql_tquery_s(g_Mysql, str_format("UPDATE vehicles SET model = %d, color1 = %d, color2 = %d WHERE id = %d", data[E_VEHICLE_ROW_MODEL], color1, color2, key));
     return true;
 }
 
@@ -329,57 +369,84 @@ static Vehicles_PickStreetModels()
     }
 }
 
-static Vehicles_StoreRow(row)
+static Vehicles_StoreRow(row, &streetIndex)
 {
-    new key;
-    cache_get_value_name_int(row, "id", key);
+    new data[e_VEHICLE_ROW];
+    cache_get_value_name_int(row, "id", data[E_VEHICLE_ROW_KEY]);
 
-    if (key < 1 || key > VEHICLE_KEY_MAX)
+    new key = data[E_VEHICLE_ROW_KEY];
+
+    if (key < 1)
     {
         return 0;
     }
 
-    s_RowUsed[key] = true;
-    cache_get_value_name_int(row, "kind", s_RowKind[key]);
-    cache_get_value_name_int(row, "model", s_RowModel[key]);
-    cache_get_value_name_int(row, "color1", s_RowColor1[key]);
-    cache_get_value_name_int(row, "color2", s_RowColor2[key]);
-    cache_get_value_name_int(row, "respawn", s_RowRespawn[key]);
-    cache_get_value_name_int(row, "interior", s_RowInterior[key]);
-    cache_get_value_name_int(row, "classes", s_RowClasses[key]);
-    cache_get_value_name_int(row, "gates", s_RowGates[key]);
-    cache_get_value_name_int(row, "shop", s_RowShop[key]);
-    cache_get_value_name_float(row, "x", s_RowPos[key][0]);
-    cache_get_value_name_float(row, "y", s_RowPos[key][1]);
-    cache_get_value_name_float(row, "z", s_RowPos[key][2]);
-    cache_get_value_name_float(row, "angle", s_RowPos[key][3]);
+    cache_get_value_name_int(row, "kind", data[E_VEHICLE_ROW_KIND]);
+    cache_get_value_name_int(row, "model", data[E_VEHICLE_ROW_MODEL]);
+    cache_get_value_name_int(row, "color1", data[E_VEHICLE_ROW_COLOR1]);
+    cache_get_value_name_int(row, "color2", data[E_VEHICLE_ROW_COLOR2]);
+    cache_get_value_name_int(row, "respawn", data[E_VEHICLE_ROW_RESPAWN]);
+    cache_get_value_name_int(row, "interior", data[E_VEHICLE_ROW_INTERIOR]);
+    cache_get_value_name_int(row, "classes", data[E_VEHICLE_ROW_CLASSES]);
+    cache_get_value_name_int(row, "gates", data[E_VEHICLE_ROW_GATES]);
+    cache_get_value_name_int(row, "shop", data[E_VEHICLE_ROW_SHOP]);
+    cache_get_value_name_float(row, "x", data[E_VEHICLE_ROW_X]);
+    cache_get_value_name_float(row, "y", data[E_VEHICLE_ROW_Y]);
+    cache_get_value_name_float(row, "z", data[E_VEHICLE_ROW_Z]);
+    cache_get_value_name_float(row, "angle", data[E_VEHICLE_ROW_ANGLE]);
+
+    if (data[E_VEHICLE_ROW_KIND] == VEHICLE_KIND_STREET)
+    {
+        data[E_VEHICLE_ROW_SLOT] = streetIndex % VEHICLE_STREET_SLOTS;
+        streetIndex++;
+    }
+
+    if (!pool_valid(s_VehicleRows))
+    {
+        s_VehicleRows = pool_new(-1, true);
+        s_VehicleRowSlots = map_new();
+    }
+
+    new slot = Vehicles_RowSlot(key);
+
+    if (slot == -1)
+    {
+        map_add(s_VehicleRowSlots, key, pool_add_arr(s_VehicleRows, data));
+    }
+    else
+    {
+        pool_set_arr(s_VehicleRows, slot, data);
+    }
+
     return key;
 }
 
 stock Vehicles_SpawnKey(key)
 {
-    if (key < 1 || key > VEHICLE_KEY_MAX || !s_RowUsed[key])
+    new data[e_VEHICLE_ROW];
+
+    if (!Vehicles_FetchRow(key, data))
     {
         return INVALID_VEHICLE_ID;
     }
 
-    new model = s_RowModel[key], color1 = s_RowColor1[key], color2 = s_RowColor2[key];
+    new model = data[E_VEHICLE_ROW_MODEL], color1 = data[E_VEHICLE_ROW_COLOR1], color2 = data[E_VEHICLE_ROW_COLOR2];
 
-    if (s_RowKind[key] == VEHICLE_KIND_STREET)
+    if (data[E_VEHICLE_ROW_KIND] == VEHICLE_KIND_STREET)
     {
-        model = s_StreetModels[s_RowSlot[key]];
+        model = s_StreetModels[data[E_VEHICLE_ROW_SLOT]];
         color1 = random(VEHICLE_STREET_COLOUR_RANGE);
     }
 
     new vehicleid;
 
-    if (s_RowKind[key] == VEHICLE_KIND_MINIGAME)
+    if (data[E_VEHICLE_ROW_KIND] == VEHICLE_KIND_MINIGAME)
     {
-        vehicleid = CreateVehicle(model, s_RowPos[key][0], s_RowPos[key][1], s_RowPos[key][2], s_RowPos[key][3], color1, color2, s_RowRespawn[key]);
+        vehicleid = CreateVehicle(model, data[E_VEHICLE_ROW_X], data[E_VEHICLE_ROW_Y], data[E_VEHICLE_ROW_Z], data[E_VEHICLE_ROW_ANGLE], color1, color2, data[E_VEHICLE_ROW_RESPAWN]);
     }
     else
     {
-        vehicleid = AddStaticVehicleEx(model, s_RowPos[key][0], s_RowPos[key][1], s_RowPos[key][2], s_RowPos[key][3], color1, color2, s_RowRespawn[key]);
+        vehicleid = AddStaticVehicleEx(model, data[E_VEHICLE_ROW_X], data[E_VEHICLE_ROW_Y], data[E_VEHICLE_ROW_Z], data[E_VEHICLE_ROW_ANGLE], color1, color2, data[E_VEHICLE_ROW_RESPAWN]);
     }
 
     if (vehicleid == INVALID_VEHICLE_ID || vehicleid < 1 || vehicleid > MAX_VEHICLES)
@@ -388,19 +455,20 @@ stock Vehicles_SpawnKey(key)
         return INVALID_VEHICLE_ID;
     }
 
+    data[E_VEHICLE_ROW_VEHICLE] = vehicleid;
+    Vehicles_StoreRowData(key, data);
     s_VehicleKey[vehicleid] = key;
-    s_KeyVehicle[key] = vehicleid;
-    s_VehicleKind[vehicleid] = s_RowKind[key];
-    s_VehicleClasses[vehicleid] = s_RowClasses[key];
-    s_VehicleGates[vehicleid] = s_RowGates[key];
-    s_VehicleShop[vehicleid] = s_RowShop[key];
+    s_VehicleKind[vehicleid] = data[E_VEHICLE_ROW_KIND];
+    s_VehicleClasses[vehicleid] = data[E_VEHICLE_ROW_CLASSES];
+    s_VehicleGates[vehicleid] = data[E_VEHICLE_ROW_GATES];
+    s_VehicleShop[vehicleid] = data[E_VEHICLE_ROW_SHOP];
 
-    if (s_RowInterior[key] != 0)
+    if (data[E_VEHICLE_ROW_INTERIOR] != 0)
     {
-        LinkVehicleToInterior(vehicleid, s_RowInterior[key]);
+        LinkVehicleToInterior(vehicleid, data[E_VEHICLE_ROW_INTERIOR]);
     }
 
-    if (s_RowKind[key] == VEHICLE_KIND_HOUSE)
+    if (data[E_VEHICLE_ROW_KIND] == VEHICLE_KIND_HOUSE)
     {
         Vehicles_SetHouseCar(key - 1, vehicleid);
     }
@@ -428,25 +496,14 @@ async Task:Vehicles_LoadWorld()
 
     for (new row = 0; row < rows; row++)
     {
-        new key = Vehicles_StoreRow(row);
-
-        if (key == 0)
-        {
-            continue;
-        }
-
-        if (s_RowKind[key] == VEHICLE_KIND_STREET)
-        {
-            s_RowSlot[key] = streetIndex % VEHICLE_STREET_SLOTS;
-            streetIndex++;
-        }
+        Vehicles_StoreRow(row, streetIndex);
     }
 
-    for (new key = 1; key <= VEHICLE_KEY_MAX; key++)
+    for (new slot = 0, slots = pool_valid(s_VehicleRows) ? pool_capacity(s_VehicleRows) : 0; slot < slots; slot++)
     {
-        if (s_RowUsed[key])
+        if (pool_has(s_VehicleRows, slot))
         {
-            Vehicles_SpawnKey(key);
+            Vehicles_SpawnKey(pool_get(s_VehicleRows, slot, _:E_VEHICLE_ROW_KEY));
         }
     }
 

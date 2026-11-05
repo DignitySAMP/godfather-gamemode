@@ -195,7 +195,7 @@ CMD:sellprods(cmdid, playerid, params[])
         return 1;
     }
 
-    for (new row = 0;row < BUSINESS_ROWS;row++)
+    for (new row = 0, rows = Business_GetRowCount();row < rows;row++)
     {
         new key = Business_GetKeyOfRow(row);
 

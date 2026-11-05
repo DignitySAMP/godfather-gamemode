@@ -10,7 +10,6 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define SADOORS_MAX (256)
 #define SADOORS_NAME_LEN (12)
 #define SADOORS_TITLE_LEN (32)
 #define SADOORS_TYPE_LEN (12)
@@ -18,7 +17,6 @@
 #define SADOORS_ANY_PRICE (-1)
 #define INVALID_SADOOR (-1)
 #define DOOR_KIND_SA "sa"
-#define SADOORS_LOCAL_BASE (3000)
 
 enum
 {
@@ -28,7 +26,7 @@ enum
     SADOOR_KIND_DOOR
 }
 
-enum E_SADOOR_DATA
+enum e_SADOOR_DATA
 {
     E_SADOOR_NAME[SADOORS_NAME_LEN],
     E_SADOOR_KIND,
@@ -47,8 +45,7 @@ enum E_SADOOR_DATA
     E_SADOOR_LEVEL
 }
 
-static s_SaDoors[SADOORS_MAX][E_SADOOR_DATA];
-static s_SaDoorCount;
+static List:s_SaDoors;
 
 /**
  *      ______                                   __      __
@@ -82,7 +79,23 @@ static SaDoors_KindOf(const text[])
     return SADOOR_KIND_NONE;
 }
 
-static bool:SaDoors_ReadRow(row,index)
+static SaDoors_Count()
+{
+    return list_valid(s_SaDoors) ? list_size(s_SaDoors) : 0;
+}
+
+static bool:SaDoors_Fetch(row,data[e_SADOOR_DATA])
+{
+    if (row < 0 || row >= SaDoors_Count())
+    {
+        return false;
+    }
+
+    list_get_arr(s_SaDoors,row,data);
+    return true;
+}
+
+static bool:SaDoors_ReadRow(row,data[e_SADOOR_DATA])
 {
     new kindText[SADOORS_KIND_LEN];
     cache_get_value_name(row,"kind",kindText,sizeof(kindText));
@@ -94,21 +107,21 @@ static bool:SaDoors_ReadRow(row,index)
         return false;
     }
 
-    cache_get_value_name(row,"name",s_SaDoors[index][E_SADOOR_NAME],SADOORS_NAME_LEN);
-    s_SaDoors[index][E_SADOOR_KIND] = kind;
-    cache_get_value_name(row,"door_type",s_SaDoors[index][E_SADOOR_TYPE],SADOORS_TYPE_LEN);
-    cache_get_value_name_int(row,"interior",s_SaDoors[index][E_SADOOR_INTERIOR]);
-    cache_get_value_name_float(row,"out_x",s_SaDoors[index][E_SADOOR_OUT_X]);
-    cache_get_value_name_float(row,"out_y",s_SaDoors[index][E_SADOOR_OUT_Y]);
-    cache_get_value_name_float(row,"out_z",s_SaDoors[index][E_SADOOR_OUT_Z]);
-    cache_get_value_name_float(row,"out_angle",s_SaDoors[index][E_SADOOR_OUT_ROT]);
-    cache_get_value_name_float(row,"in_x",s_SaDoors[index][E_SADOOR_IN_X]);
-    cache_get_value_name_float(row,"in_y",s_SaDoors[index][E_SADOOR_IN_Y]);
-    cache_get_value_name_float(row,"in_z",s_SaDoors[index][E_SADOOR_IN_Z]);
-    cache_get_value_name_float(row,"in_angle",s_SaDoors[index][E_SADOOR_IN_ROT]);
-    cache_get_value_name(row,"title",s_SaDoors[index][E_SADOOR_TITLE],SADOORS_TITLE_LEN);
-    cache_get_value_name_int(row,"price",s_SaDoors[index][E_SADOOR_PRICE]);
-    cache_get_value_name_int(row,"level",s_SaDoors[index][E_SADOOR_LEVEL]);
+    cache_get_value_name(row,"name",data[E_SADOOR_NAME],SADOORS_NAME_LEN);
+    data[E_SADOOR_KIND] = kind;
+    cache_get_value_name(row,"door_type",data[E_SADOOR_TYPE],SADOORS_TYPE_LEN);
+    cache_get_value_name_int(row,"interior",data[E_SADOOR_INTERIOR]);
+    cache_get_value_name_float(row,"out_x",data[E_SADOOR_OUT_X]);
+    cache_get_value_name_float(row,"out_y",data[E_SADOOR_OUT_Y]);
+    cache_get_value_name_float(row,"out_z",data[E_SADOOR_OUT_Z]);
+    cache_get_value_name_float(row,"out_angle",data[E_SADOOR_OUT_ROT]);
+    cache_get_value_name_float(row,"in_x",data[E_SADOOR_IN_X]);
+    cache_get_value_name_float(row,"in_y",data[E_SADOOR_IN_Y]);
+    cache_get_value_name_float(row,"in_z",data[E_SADOOR_IN_Z]);
+    cache_get_value_name_float(row,"in_angle",data[E_SADOOR_IN_ROT]);
+    cache_get_value_name(row,"title",data[E_SADOOR_TITLE],SADOORS_TITLE_LEN);
+    cache_get_value_name_int(row,"price",data[E_SADOOR_PRICE]);
+    cache_get_value_name_int(row,"level",data[E_SADOOR_LEVEL]);
     return true;
 }
 
@@ -124,19 +137,22 @@ async Task:SaDoors_LoadAll()
         return async 0;
     }
 
-    s_SaDoorCount = 0;
+    if (list_valid(s_SaDoors))
+    {
+        list_clear(s_SaDoors);
+    }
+    else
+    {
+        s_SaDoors = list_new();
+    }
 
     for (new row = 0, rows = cache_num_rows();row < rows;row++)
     {
-        if (s_SaDoorCount >= SADOORS_MAX)
-        {
-            Log_Error("doors","sa_doors has more doors than SADOORS_MAX");
-            break;
-        }
+        new data[e_SADOOR_DATA];
 
-        if (SaDoors_ReadRow(row,s_SaDoorCount))
+        if (SaDoors_ReadRow(row,data))
         {
-            s_SaDoorCount++;
+            list_add_arr(s_SaDoors,data);
         }
         else
         {
@@ -144,85 +160,95 @@ async Task:SaDoors_LoadAll()
         }
     }
 
-    if (s_SaDoorCount == 0)
+    new count = SaDoors_Count();
+
+    if (count == 0)
     {
         Log_Warn("doors","sa_doors is empty, import godfather.sql into the database");
     }
 
-    Log_Info("doors","%d SA doors loaded",s_SaDoorCount);
-    return async s_SaDoorCount;
+    Log_Info("doors","%d SA doors loaded",count);
+    return async count;
 }
 #pragma warning pop
 
 stock SaDoors_GetKind(row)
 {
-    return row >= 0 && row < s_SaDoorCount ? s_SaDoors[row][E_SADOOR_KIND] : SADOOR_KIND_NONE;
+    new data[e_SADOOR_DATA];
+    return SaDoors_Fetch(row,data) ? data[E_SADOOR_KIND] : SADOOR_KIND_NONE;
 }
 
 stock SaDoors_GetName(row,dest[],size = sizeof(dest))
 {
+    new data[e_SADOOR_DATA];
     dest[0] = EOS;
 
-    if (row >= 0 && row < s_SaDoorCount)
+    if (SaDoors_Fetch(row,data))
     {
-        strcopy(dest,s_SaDoors[row][E_SADOOR_NAME],size);
+        strcopy(dest,data[E_SADOOR_NAME],size);
     }
 }
 
 stock SaDoors_GetType(row,dest[],size = sizeof(dest))
 {
+    new data[e_SADOOR_DATA];
     dest[0] = EOS;
 
-    if (row >= 0 && row < s_SaDoorCount)
+    if (SaDoors_Fetch(row,data))
     {
-        strcopy(dest,s_SaDoors[row][E_SADOOR_TYPE],size);
+        strcopy(dest,data[E_SADOOR_TYPE],size);
     }
 }
 
 stock SaDoors_GetTitle(row,dest[],size = sizeof(dest))
 {
+    new data[e_SADOOR_DATA];
     dest[0] = EOS;
 
-    if (row >= 0 && row < s_SaDoorCount)
+    if (SaDoors_Fetch(row,data))
     {
-        strcopy(dest,s_SaDoors[row][E_SADOOR_TITLE],size);
+        strcopy(dest,data[E_SADOOR_TITLE],size);
     }
 }
 
 stock SaDoors_GetInterior(row)
 {
-    return row >= 0 && row < s_SaDoorCount ? s_SaDoors[row][E_SADOOR_INTERIOR] : 0;
+    new data[e_SADOOR_DATA];
+    return SaDoors_Fetch(row,data) ? data[E_SADOOR_INTERIOR] : 0;
 }
 
 stock SaDoors_GetPrice(row)
 {
-    return row >= 0 && row < s_SaDoorCount ? s_SaDoors[row][E_SADOOR_PRICE] : 0;
+    new data[e_SADOOR_DATA];
+    return SaDoors_Fetch(row,data) ? data[E_SADOOR_PRICE] : 0;
 }
 
 stock SaDoors_GetLevel(row)
 {
-    return row >= 0 && row < s_SaDoorCount ? s_SaDoors[row][E_SADOOR_LEVEL] : 0;
+    new data[e_SADOOR_DATA];
+    return SaDoors_Fetch(row,data) ? data[E_SADOOR_LEVEL] : 0;
 }
 
 stock SaDoors_GetInside(row,&Float:x,&Float:y,&Float:z,&Float:angle)
 {
+    new data[e_SADOOR_DATA];
     x = 0.0;
     y = 0.0;
     z = 0.0;
     angle = 0.0;
 
-    if (row >= 0 && row < s_SaDoorCount)
+    if (SaDoors_Fetch(row,data))
     {
-        x = s_SaDoors[row][E_SADOOR_IN_X];
-        y = s_SaDoors[row][E_SADOOR_IN_Y];
-        z = s_SaDoors[row][E_SADOOR_IN_Z];
-        angle = s_SaDoors[row][E_SADOOR_IN_ROT];
+        x = data[E_SADOOR_IN_X];
+        y = data[E_SADOOR_IN_Y];
+        z = data[E_SADOOR_IN_Z];
+        angle = data[E_SADOOR_IN_ROT];
     }
 }
 
-static Float:SaDoors_Distance(row,Float:x,Float:y,Float:z)
+static Float:SaDoors_Distance(const data[e_SADOOR_DATA],Float:x,Float:y,Float:z)
 {
-    new Float:deltaX = s_SaDoors[row][E_SADOOR_OUT_X] - x, Float:deltaY = s_SaDoors[row][E_SADOOR_OUT_Y] - y, Float:deltaZ = s_SaDoors[row][E_SADOOR_OUT_Z] - z;
+    new Float:deltaX = data[E_SADOOR_OUT_X] - x, Float:deltaY = data[E_SADOOR_OUT_Y] - y, Float:deltaZ = data[E_SADOOR_OUT_Z] - z;
     return floatsqroot(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
 }
 
@@ -230,54 +256,58 @@ stock SaDoors_FindNearest(kind,const type[],price,const name[],Float:x,Float:y,F
 {
     distance = 0.0;
 
-    new tierPrice = -1;
+    new tierPrice = -1, data[e_SADOOR_DATA], count = SaDoors_Count();
 
     if (price != SADOORS_ANY_PRICE && name[0] == EOS)
     {
         new bestGap = cellmax;
 
-        for (new row = 0;row < s_SaDoorCount;row++)
+        for (new row = 0;row < count;row++)
         {
-            if (s_SaDoors[row][E_SADOOR_KIND] != kind || (type[0] != EOS && strcmp(s_SaDoors[row][E_SADOOR_TYPE],type,true)))
+            list_get_arr(s_SaDoors,row,data);
+
+            if (data[E_SADOOR_KIND] != kind || (type[0] != EOS && strcmp(data[E_SADOOR_TYPE],type,true)))
             {
                 continue;
             }
 
-            new gap = s_SaDoors[row][E_SADOOR_PRICE] - price;
+            new gap = data[E_SADOOR_PRICE] - price;
 
             if (gap < 0)
             {
                 gap = -gap;
             }
 
-            if (gap < bestGap || (gap == bestGap && s_SaDoors[row][E_SADOOR_PRICE] < tierPrice))
+            if (gap < bestGap || (gap == bestGap && data[E_SADOOR_PRICE] < tierPrice))
             {
                 bestGap = gap;
-                tierPrice = s_SaDoors[row][E_SADOOR_PRICE];
+                tierPrice = data[E_SADOOR_PRICE];
             }
         }
     }
 
     new best = INVALID_SADOOR, Float:bestDistance = 0.0;
 
-    for (new row = 0;row < s_SaDoorCount;row++)
+    for (new row = 0;row < count;row++)
     {
-        if (s_SaDoors[row][E_SADOOR_KIND] != kind || (type[0] != EOS && strcmp(s_SaDoors[row][E_SADOOR_TYPE],type,true)))
+        list_get_arr(s_SaDoors,row,data);
+
+        if (data[E_SADOOR_KIND] != kind || (type[0] != EOS && strcmp(data[E_SADOOR_TYPE],type,true)))
         {
             continue;
         }
 
-        if (name[0] != EOS && strcmp(s_SaDoors[row][E_SADOOR_NAME],name,true))
+        if (name[0] != EOS && strcmp(data[E_SADOOR_NAME],name,true))
         {
             continue;
         }
 
-        if (tierPrice != -1 && s_SaDoors[row][E_SADOOR_PRICE] != tierPrice)
+        if (tierPrice != -1 && data[E_SADOOR_PRICE] != tierPrice)
         {
             continue;
         }
 
-        new Float:rowDistance = SaDoors_Distance(row,x,y,z);
+        new Float:rowDistance = SaDoors_Distance(data,x,y,z);
 
         if (best == INVALID_SADOOR || rowDistance < bestDistance)
         {
@@ -292,16 +322,18 @@ stock SaDoors_FindNearest(kind,const type[],price,const name[],Float:x,Float:y,F
 
 stock SaDoors_RegisterPlain()
 {
-    new registered = 0;
+    new registered = 0, data[e_SADOOR_DATA];
 
-    for (new row = 0;row < s_SaDoorCount;row++)
+    for (new row = 0, rows = SaDoors_Count();row < rows;row++)
     {
-        if (s_SaDoors[row][E_SADOOR_KIND] != SADOOR_KIND_DOOR)
+        list_get_arr(s_SaDoors,row,data);
+
+        if (data[E_SADOOR_KIND] != SADOOR_KIND_DOOR)
         {
             continue;
         }
 
-        Doors_Register(DOOR_KIND_SA,row,s_SaDoors[row][E_SADOOR_OUT_X],s_SaDoors[row][E_SADOOR_OUT_Y],s_SaDoors[row][E_SADOOR_OUT_Z],s_SaDoors[row][E_SADOOR_IN_X],s_SaDoors[row][E_SADOOR_IN_Y],s_SaDoors[row][E_SADOOR_IN_Z],s_SaDoors[row][E_SADOOR_INTERIOR],SADOORS_LOCAL_BASE + row,3.0,3.0,DOOR_FLAG_NONE,DOOR_WORLD_KEEP,"","","","",s_SaDoors[row][E_SADOOR_OUT_ROT],s_SaDoors[row][E_SADOOR_IN_ROT]);
+        Doors_Register(DOOR_KIND_SA,row,data[E_SADOOR_OUT_X],data[E_SADOOR_OUT_Y],data[E_SADOOR_OUT_Z],data[E_SADOOR_IN_X],data[E_SADOOR_IN_Y],data[E_SADOOR_IN_Z],data[E_SADOOR_INTERIOR],PROPERTY_LOCAL_SADOOR_BASE + row,3.0,3.0,DOOR_FLAG_NONE,DOOR_WORLD_KEEP,"","","","",data[E_SADOOR_OUT_ROT],data[E_SADOOR_IN_ROT]);
         registered++;
     }
 

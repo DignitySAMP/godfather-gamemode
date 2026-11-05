@@ -35,11 +35,11 @@ stock Business_GetTypedAt(playerid,type)
         return BUSINESS_NO_KEY;
     }
 
-    new local = Account_GetLocal(playerid);
+    new key = Business_FromTypedLocal(Account_GetLocal(playerid));
 
-    if (Business_IsTyped(local) && Business_IsValid(local) && Business_GetType(local) == type)
+    if (Business_IsTyped(key) && Business_IsValid(key) && Business_GetType(key) == type)
     {
-        return local;
+        return key;
     }
 
     return BUSINESS_NO_KEY;

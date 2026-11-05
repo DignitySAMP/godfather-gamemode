@@ -10,7 +10,6 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define HINTS_MAX (64)
 #define HINTS_TEXT_LEN (160)
 #define HINTS_CALLBACK_LEN (32)
 #define HINTS_TIME_MS (5000)
@@ -24,7 +23,7 @@
 #define HINT_GATE_NO_JOB_NO_MEMBER (2)
 #define HINT_GATE_CALLBACK (3)
 
-enum E_HINT
+enum e_HINT
 {
     Float:E_HINT_X,
     Float:E_HINT_Y,
@@ -38,8 +37,7 @@ enum E_HINT
     E_HINT_ACTION[HINTS_CALLBACK_LEN]
 }
 
-static s_Hints[HINTS_MAX][E_HINT];
-static s_HintCount;
+static List:s_Hints;
 
 static const Float:s_HintsJobPlaces[HINTS_JOB_PLACES][3] =
 {
@@ -103,24 +101,23 @@ static const s_HintsJobPlaceGates[HINTS_JOB_PLACES] =
  */
 static Hints_Add(Float:x,Float:y,Float:z,Float:radius,const text[],style,bool:onFoot,gateKind,const gate[],const action[])
 {
-    if (s_HintCount >= HINTS_MAX)
+    if (!list_valid(s_Hints))
     {
-        Log_Error("hints","hint table full, %s was not added",text);
-        return -1;
+        s_Hints = list_new();
     }
 
-    new slot = s_HintCount++;
-    s_Hints[slot][E_HINT_X] = x;
-    s_Hints[slot][E_HINT_Y] = y;
-    s_Hints[slot][E_HINT_Z] = z;
-    s_Hints[slot][E_HINT_RADIUS] = radius;
-    strcopy(s_Hints[slot][E_HINT_TEXT],text,HINTS_TEXT_LEN);
-    s_Hints[slot][E_HINT_STYLE] = style;
-    s_Hints[slot][E_HINT_ON_FOOT] = onFoot;
-    s_Hints[slot][E_HINT_GATE_KIND] = gateKind;
-    strcopy(s_Hints[slot][E_HINT_GATE_CALLBACK],gate,HINTS_CALLBACK_LEN);
-    strcopy(s_Hints[slot][E_HINT_ACTION],action,HINTS_CALLBACK_LEN);
-    return slot;
+    new hint[e_HINT];
+    hint[E_HINT_X] = x;
+    hint[E_HINT_Y] = y;
+    hint[E_HINT_Z] = z;
+    hint[E_HINT_RADIUS] = radius;
+    strcopy(hint[E_HINT_TEXT],text,HINTS_TEXT_LEN);
+    hint[E_HINT_STYLE] = style;
+    hint[E_HINT_ON_FOOT] = onFoot;
+    hint[E_HINT_GATE_KIND] = gateKind;
+    strcopy(hint[E_HINT_GATE_CALLBACK],gate,HINTS_CALLBACK_LEN);
+    strcopy(hint[E_HINT_ACTION],action,HINTS_CALLBACK_LEN);
+    return list_add_arr(s_Hints,hint);
 }
 
 stock Hints_Register(Float:x,Float:y,Float:z,Float:radius,const text[],style = HINTS_STYLE_DEFAULT,bool:onFoot = false,const gate[] = "")
@@ -154,9 +151,9 @@ stock Hints_RegisterBuiltin()
     }
 }
 
-static bool:Hints_GatePasses(playerid,slot)
+static bool:Hints_GatePasses(playerid,const hint[e_HINT])
 {
-    switch (s_Hints[slot][E_HINT_GATE_KIND])
+    switch (hint[E_HINT_GATE_KIND])
     {
         case HINT_GATE_NO_JOB:
         {
@@ -170,7 +167,7 @@ static bool:Hints_GatePasses(playerid,slot)
 
         case HINT_GATE_CALLBACK:
         {
-            return CallLocalFunction(s_Hints[slot][E_HINT_GATE_CALLBACK],"d",playerid) != 0;
+            return CallLocalFunction(hint[E_HINT_GATE_CALLBACK],"d",playerid) != 0;
         }
     }
 
@@ -179,30 +176,39 @@ static bool:Hints_GatePasses(playerid,slot)
 
 stock bool:Hints_ShowFixed(playerid)
 {
-    for (new slot = 0;slot < s_HintCount;slot++)
+    if (!list_valid(s_Hints))
     {
-        if (!Property_IsNear(playerid,s_Hints[slot][E_HINT_RADIUS],s_Hints[slot][E_HINT_X],s_Hints[slot][E_HINT_Y],s_Hints[slot][E_HINT_Z]))
+        return false;
+    }
+
+    new hint[e_HINT];
+
+    for (new slot = 0, count = list_size(s_Hints);slot < count;slot++)
+    {
+        list_get_arr(s_Hints,slot,hint);
+
+        if (!Property_IsNear(playerid,hint[E_HINT_RADIUS],hint[E_HINT_X],hint[E_HINT_Y],hint[E_HINT_Z]))
         {
             continue;
         }
 
-        if (s_Hints[slot][E_HINT_ON_FOOT] && GetPlayerState(playerid) != PLAYER_STATE_ONFOOT)
+        if (hint[E_HINT_ON_FOOT] && GetPlayerState(playerid) != PLAYER_STATE_ONFOOT)
         {
             continue;
         }
 
-        if (!Hints_GatePasses(playerid,slot))
+        if (!Hints_GatePasses(playerid,hint))
         {
             continue;
         }
 
-        if (s_Hints[slot][E_HINT_ACTION][0] != EOS)
+        if (hint[E_HINT_ACTION][0] != EOS)
         {
-            CallLocalFunction(s_Hints[slot][E_HINT_ACTION],"d",playerid);
+            CallLocalFunction(hint[E_HINT_ACTION],"d",playerid);
         }
         else
         {
-            Hints_Show(playerid,s_Hints[slot][E_HINT_TEXT],s_Hints[slot][E_HINT_STYLE]);
+            Hints_Show(playerid,hint[E_HINT_TEXT],hint[E_HINT_STYLE]);
         }
 
         return true;

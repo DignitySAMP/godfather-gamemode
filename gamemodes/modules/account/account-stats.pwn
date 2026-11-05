@@ -10,7 +10,6 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define STATS_MAX_VALUES (96)
 #define STATS_KEY_LEN (24)
 #define STATS_VALUE_LEN (48)
 #define STATS_LINE_LEN (256)
@@ -24,9 +23,7 @@
 #define STATS_LINE_5 "Drugs:[{Drugs|0}] Materials:[{Materials|0}] Team:[{Team}] Disease:[{Disease|None}] Organisation:[{Organisation|None}] Rank:[{Rank|None}]"
 #define STATS_LINE_ADMIN "House key [{HouseKey|255}] Business key [{BusinessKey|255}] HireKey [{HireKey|299}] int:[{Interior}] local[{Local}]"
 
-static s_StatsKeys[STATS_MAX_VALUES][STATS_KEY_LEN];
-static s_StatsValues[STATS_MAX_VALUES][STATS_VALUE_LEN];
-static s_StatsCount;
+static Map:s_Stats;
 
 forward Stats_OnBuild(playerid,targetid);
 
@@ -42,26 +39,29 @@ forward Stats_OnBuild(playerid,targetid);
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static Stats_Key(const key[],dest[STATS_KEY_LEN])
+{
+    strcopy(dest,key,STATS_KEY_LEN);
+
+    for (new i = 0;dest[i] != EOS;i++)
+    {
+        dest[i] = tolower(dest[i]);
+    }
+}
+
 stock Stats_SetText(const key[],const value[])
 {
-    for (new i = 0;i < s_StatsCount;i++)
+    new lowered[STATS_KEY_LEN], stored[STATS_VALUE_LEN];
+    Stats_Key(key,lowered);
+    strcopy(stored,value,STATS_VALUE_LEN);
+
+    if (!map_valid(s_Stats))
     {
-        if (!strcmp(s_StatsKeys[i],key,true))
-        {
-            strcopy(s_StatsValues[i],value,STATS_VALUE_LEN);
-            return true;
-        }
+        s_Stats = map_new();
     }
 
-    if (s_StatsCount >= STATS_MAX_VALUES)
-    {
-        Log_Error("stats","no room for value %s: raise STATS_MAX_VALUES",key);
-        return false;
-    }
-
-    strcopy(s_StatsKeys[s_StatsCount],key,STATS_KEY_LEN);
-    strcopy(s_StatsValues[s_StatsCount],value,STATS_VALUE_LEN);
-    s_StatsCount++;
+    map_str_remove(s_Stats,lowered);
+    map_str_add_str(s_Stats,lowered,stored);
     return true;
 }
 
@@ -81,16 +81,16 @@ stock Stats_SetFloat(const key[],Float:value)
 
 static Stats_Lookup(const key[],dest[],size)
 {
-    for (new i = 0;i < s_StatsCount;i++)
+    new lowered[STATS_KEY_LEN];
+    Stats_Key(key,lowered);
+
+    if (!map_valid(s_Stats) || !map_has_str_key(s_Stats,lowered))
     {
-        if (!strcmp(s_StatsKeys[i],key,true))
-        {
-            strcopy(dest,s_StatsValues[i],size);
-            return true;
-        }
+        return false;
     }
 
-    return false;
+    map_str_get_str(s_Stats,lowered,dest,size);
+    return true;
 }
 
 stock Stats_Render(const template[],dest[],size = sizeof(dest))
@@ -148,7 +148,10 @@ stock Stats_Render(const template[],dest[],size = sizeof(dest))
 
 static Stats_FillAccount(targetid)
 {
-    s_StatsCount = 0;
+    if (map_valid(s_Stats))
+    {
+        map_clear(s_Stats);
+    }
 
     new level = Account_GetLevel(targetid), text[STATS_VALUE_LEN];
     Stats_SetNumber("Level",level);

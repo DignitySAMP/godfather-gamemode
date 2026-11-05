@@ -10,13 +10,10 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define GET_MAX (8)
 #define GET_NAME_LEN (16)
 #define GET_REST_LEN (64)
 
-static s_GetNames[GET_MAX][GET_NAME_LEN];
-static s_GetCallbacks[GET_MAX][JOBS_CALLBACK_LEN];
-static s_GetCount;
+static Map:s_GetOptions;
 
 forward Drugs_GetDrugs(playerid,const params[]);
 forward Drugs_GetFuel(playerid,const params[]);
@@ -33,6 +30,38 @@ forward Drugs_GetFuel(playerid,const params[]);
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static bool:Get_Key(const name[],dest[GET_NAME_LEN])
+{
+    if (name[0] == EOS || strlen(name) >= GET_NAME_LEN)
+    {
+        dest[0] = EOS;
+        return false;
+    }
+
+    strcopy(dest,name,GET_NAME_LEN);
+
+    for (new i = 0;dest[i] != EOS;i++)
+    {
+        dest[i] = tolower(dest[i]);
+    }
+
+    return true;
+}
+
+static bool:Get_Find(const name[],dest[],size = sizeof(dest))
+{
+    new key[GET_NAME_LEN];
+    dest[0] = EOS;
+
+    if (!map_valid(s_GetOptions) || !Get_Key(name,key) || !map_has_str_key(s_GetOptions,key))
+    {
+        return false;
+    }
+
+    map_str_get_str(s_GetOptions,key,dest,size);
+    return true;
+}
+
 stock bool:Get_Register(const name[],const callback[])
 {
     if (name[0] == EOS || strlen(name) >= GET_NAME_LEN)
@@ -46,36 +75,27 @@ stock bool:Get_Register(const name[],const callback[])
         return false;
     }
 
-    for (new i = 0;i < s_GetCount;i++)
+    new key[GET_NAME_LEN], stored[JOBS_CALLBACK_LEN];
+    Get_Key(name,key);
+    strcopy(stored,callback,JOBS_CALLBACK_LEN);
+
+    if (!map_valid(s_GetOptions))
     {
-        if (!strcmp(s_GetNames[i],name,true))
-        {
-            strcopy(s_GetCallbacks[i],callback,JOBS_CALLBACK_LEN);
-            return true;
-        }
+        s_GetOptions = map_new();
     }
 
-    if (s_GetCount >= GET_MAX)
-    {
-        Log_Error("drugs","no room for get option %s: raise GET_MAX",name);
-        return false;
-    }
-
-    strcopy(s_GetNames[s_GetCount],name,GET_NAME_LEN);
-    strcopy(s_GetCallbacks[s_GetCount],callback,JOBS_CALLBACK_LEN);
-    s_GetCount++;
+    map_str_remove(s_GetOptions,key);
+    map_str_add_str(s_GetOptions,key,stored);
     return true;
 }
 
 static Get_Run(playerid,const name[],const rest[])
 {
-    for (new i = 0;i < s_GetCount;i++)
+    new callback[JOBS_CALLBACK_LEN];
+
+    if (Get_Find(name,callback))
     {
-        if (!strcmp(s_GetNames[i],name,true))
-        {
-            pawn_call_public(s_GetCallbacks[i],"ds",playerid,rest);
-            return;
-        }
+        pawn_call_public(callback,"ds",playerid,rest);
     }
 }
 

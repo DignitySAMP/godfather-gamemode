@@ -11,7 +11,6 @@
  *
  */
 #define OFFER_NAME_LEN (16)
-#define OFFER_MAX (32)
 #define OFFER_REST_LEN (128)
 #define OFFER_NONE (INVALID_PLAYER_ID)
 #define OFFER_STALE (-2)
@@ -24,9 +23,7 @@ enum
     OFFER_KIND_COUNT
 }
 
-static s_OfferNames[OFFER_KIND_COUNT][OFFER_MAX][OFFER_NAME_LEN];
-static s_OfferCallbacks[OFFER_KIND_COUNT][OFFER_MAX][JOBS_CALLBACK_LEN];
-static s_OfferCounts[OFFER_KIND_COUNT];
+static Map:s_Offers[OFFER_KIND_COUNT];
 
 forward Jobs_AcceptTicket(playerid,const params[]);
 forward Jobs_CancelTicket(playerid,const params[]);
@@ -43,6 +40,38 @@ forward Jobs_CancelTicket(playerid,const params[]);
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static bool:Offer_Key(const name[],dest[OFFER_NAME_LEN])
+{
+    if (name[0] == EOS || strlen(name) >= OFFER_NAME_LEN)
+    {
+        dest[0] = EOS;
+        return false;
+    }
+
+    strcopy(dest,name,OFFER_NAME_LEN);
+
+    for (new i = 0;dest[i] != EOS;i++)
+    {
+        dest[i] = tolower(dest[i]);
+    }
+
+    return true;
+}
+
+static bool:Offer_Find(kind,const name[],dest[],size = sizeof(dest))
+{
+    new key[OFFER_NAME_LEN];
+    dest[0] = EOS;
+
+    if (kind < 0 || kind >= OFFER_KIND_COUNT || !map_valid(s_Offers[kind]) || !Offer_Key(name,key) || !map_has_str_key(s_Offers[kind],key))
+    {
+        return false;
+    }
+
+    map_str_get_str(s_Offers[kind],key,dest,size);
+    return true;
+}
+
 static bool:Offer_Register(kind,const name[],const callback[])
 {
     if (kind < 0 || kind >= OFFER_KIND_COUNT || name[0] == EOS || strlen(name) >= OFFER_NAME_LEN)
@@ -56,24 +85,17 @@ static bool:Offer_Register(kind,const name[],const callback[])
         return false;
     }
 
-    for (new i = 0;i < s_OfferCounts[kind];i++)
+    new key[OFFER_NAME_LEN], stored[JOBS_CALLBACK_LEN];
+    Offer_Key(name,key);
+    strcopy(stored,callback,JOBS_CALLBACK_LEN);
+
+    if (!map_valid(s_Offers[kind]))
     {
-        if (!strcmp(s_OfferNames[kind][i],name,true))
-        {
-            strcopy(s_OfferCallbacks[kind][i],callback,JOBS_CALLBACK_LEN);
-            return true;
-        }
+        s_Offers[kind] = map_new();
     }
 
-    if (s_OfferCounts[kind] >= OFFER_MAX)
-    {
-        Log_Error("jobs","no room for offer %s: raise OFFER_MAX",name);
-        return false;
-    }
-
-    new slot = s_OfferCounts[kind]++;
-    strcopy(s_OfferNames[kind][slot],name,OFFER_NAME_LEN);
-    strcopy(s_OfferCallbacks[kind][slot],callback,JOBS_CALLBACK_LEN);
+    map_str_remove(s_Offers[kind],key);
+    map_str_add_str(s_Offers[kind],key,stored);
     return true;
 }
 
@@ -94,16 +116,15 @@ stock bool:Service_Register(const name[],const callback[])
 
 static Offer_Run(kind,playerid,const name[],const rest[],&result)
 {
-    for (new i = 0;i < s_OfferCounts[kind];i++)
+    new callback[JOBS_CALLBACK_LEN];
+
+    if (!Offer_Find(kind,name,callback))
     {
-        if (!strcmp(s_OfferNames[kind][i],name,true))
-        {
-            result = pawn_call_public(s_OfferCallbacks[kind][i],"ds",playerid,rest);
-            return true;
-        }
+        return false;
     }
 
-    return false;
+    result = pawn_call_public(callback,"ds",playerid,rest);
+    return true;
 }
 
 stock Offer_Sweep(offerers[],leaving,size = MAX_PLAYERS)

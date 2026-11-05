@@ -10,32 +10,26 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define MIGRATION_MAX (256)
 #define MIGRATION_KEY_LEN (48)
 
-static s_MigrationKeys[MIGRATION_MAX][MIGRATION_KEY_LEN];
-static List:s_MigrationSql = List:0;
-static s_MigrationCount;
-
-static s_MigrationApplied[MIGRATION_MAX][MIGRATION_KEY_LEN];
-static s_MigrationAppliedCount;
+static List:s_MigrationKeys;
+static List:s_MigrationSql;
+static Map:s_MigrationApplied;
 static s_MigrationRunning = -1;
 static s_MigrationRan;
 static s_MigrationSkipped;
 static s_MigrationFailed;
 
-#define BOOT_MAX_LOADERS (64)
 #define BOOT_NAME_LEN (32)
 
-enum E_BOOT_LOADER
+enum e_BOOT_LOADER
 {
     E_BOOT_NAME[BOOT_NAME_LEN],
     E_BOOT_AFTER[BOOT_NAME_LEN],
     bool:E_BOOT_DONE,
 }
 
-static s_BootLoaders[BOOT_MAX_LOADERS][E_BOOT_LOADER];
-static s_BootLoaderCount;
+static List:s_BootLoaders;
 static s_BootRunning = -1;
 
 /**
@@ -52,33 +46,14 @@ static s_BootRunning = -1;
  */
 stock Migration_Add(const key[], const sql[])
 {
-    if (s_MigrationCount >= MIGRATION_MAX)
+    if (!list_valid(s_MigrationSql))
     {
-        Log_Warn("migrations", "no room for %s", key);
-        return;
-    }
-
-    if (s_MigrationSql == List:0)
-    {
+        s_MigrationKeys = list_new();
         s_MigrationSql = list_new();
     }
 
-    format(s_MigrationKeys[s_MigrationCount], MIGRATION_KEY_LEN, "%s", key);
+    list_add_str(s_MigrationKeys, key);
     list_add_str(s_MigrationSql, sql);
-    s_MigrationCount++;
-}
-
-static bool:Migrations_IsListed(const keys[][], count, const key[])
-{
-    for (new i = 0;i < count;i++)
-    {
-        if (!strcmp(keys[i], key))
-        {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 stock Migrations_Run()
@@ -87,27 +62,35 @@ stock Migrations_Run()
     pawn_call_public("Migrations_RunOnBoot", "");
 }
 
+static Boot_CountLoaders()
+{
+    return list_valid(s_BootLoaders) ? list_size(s_BootLoaders) : 0;
+}
+
 stock Boot_RegisterLoader(const name[], const after[] = "")
 {
-    if (s_BootLoaderCount >= BOOT_MAX_LOADERS)
+    if (!list_valid(s_BootLoaders))
     {
-        Log_Error("boot", "no room for loader %s: raise BOOT_MAX_LOADERS, this loader would never run", name);
-        return;
+        s_BootLoaders = list_new();
     }
 
-    format(s_BootLoaders[s_BootLoaderCount][E_BOOT_NAME], BOOT_NAME_LEN, "%s", name);
-    format(s_BootLoaders[s_BootLoaderCount][E_BOOT_AFTER], BOOT_NAME_LEN, "%s", after);
-    s_BootLoaders[s_BootLoaderCount][E_BOOT_DONE] = false;
-    s_BootLoaderCount++;
+    new loader[e_BOOT_LOADER];
+    format(loader[E_BOOT_NAME], BOOT_NAME_LEN, "%s", name);
+    format(loader[E_BOOT_AFTER], BOOT_NAME_LEN, "%s", after);
+    list_add_arr(s_BootLoaders, loader);
 }
 
 static bool:Boot_IsDone(const name[])
 {
-    for (new i = 0;i < s_BootLoaderCount;i++)
+    new loader[e_BOOT_LOADER];
+
+    for (new i = 0, count = Boot_CountLoaders();i < count;i++)
     {
-        if (!strcmp(s_BootLoaders[i][E_BOOT_NAME], name))
+        list_get_arr(s_BootLoaders, i, loader);
+
+        if (!strcmp(loader[E_BOOT_NAME], name))
         {
-            return s_BootLoaders[i][E_BOOT_DONE];
+            return loader[E_BOOT_DONE];
         }
     }
 
@@ -127,7 +110,7 @@ stock Boot_LoaderDone()
         return;
     }
 
-    s_BootLoaders[s_BootRunning][E_BOOT_DONE] = true;
+    list_set_cell(s_BootLoaders, s_BootRunning, _:E_BOOT_DONE, true);
     s_BootRunning = -1;
     Boot_Next();
 }
@@ -136,7 +119,7 @@ stock Boot_Run()
 {
     if (!IsDatabaseReady())
     {
-        Log_Warn("boot", "database not ready, %d loaders skipped", s_BootLoaderCount);
+        Log_Warn("boot", "database not ready, %d loaders skipped", Boot_CountLoaders());
         Boot_Finish();
         return;
     }
@@ -171,14 +154,22 @@ public Migrations_RunOnBoot()
 
     await mysql_aquery_s(g_Mysql, str_new("CREATE TABLE IF NOT EXISTS schema_migrations (migration_key VARCHAR(48) NOT NULL, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (migration_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"));
 
-    s_MigrationAppliedCount = 0;
+    if (map_valid(s_MigrationApplied))
+    {
+        map_clear(s_MigrationApplied);
+    }
+    else
+    {
+        s_MigrationApplied = map_new();
+    }
 
     await mysql_aquery_s(g_Mysql, str_new("SELECT migration_key FROM schema_migrations"));
 
-    for (new row = 0, rows = cache_num_rows();row < rows && s_MigrationAppliedCount < MIGRATION_MAX;row++)
+    for (new row = 0, rows = cache_num_rows();row < rows;row++)
     {
-        cache_get_value_name(row, "migration_key", s_MigrationApplied[s_MigrationAppliedCount], MIGRATION_KEY_LEN);
-        s_MigrationAppliedCount++;
+        new key[MIGRATION_KEY_LEN];
+        cache_get_value_name(row, "migration_key", key, MIGRATION_KEY_LEN);
+        map_str_add(s_MigrationApplied, key, 1);
     }
 
     s_MigrationRan = 0;
@@ -191,9 +182,12 @@ public Migrations_RunOnBoot()
 
 static Migrations_Step(from)
 {
-    for (new i = from;i < s_MigrationCount;i++)
+    for (new i = from, count = list_valid(s_MigrationKeys) ? list_size(s_MigrationKeys) : 0;i < count;i++)
     {
-        if (Migrations_IsListed(s_MigrationApplied, s_MigrationAppliedCount, s_MigrationKeys[i]))
+        new key[MIGRATION_KEY_LEN];
+        list_get_str(s_MigrationKeys, i, key);
+
+        if (map_has_str_key(s_MigrationApplied, key))
         {
             s_MigrationSkipped++;
             continue;
@@ -218,7 +212,10 @@ public Migrations_OnStatement(index)
     }
 
     s_MigrationRunning = -1;
-    mysql_pquery_s(g_Mysql, str_format("INSERT IGNORE INTO schema_migrations (migration_key) VALUES ('%e')", s_MigrationKeys[index]));
+
+    new key[MIGRATION_KEY_LEN];
+    list_get_str(s_MigrationKeys, index, key);
+    mysql_pquery_s(g_Mysql, str_format("INSERT IGNORE INTO schema_migrations (migration_key) VALUES ('%e')", key));
     s_MigrationRan++;
 
     Migrations_Step(index + 1);
@@ -238,10 +235,11 @@ hook OnQueryError(errorid, const error[], const callback[], const query[], MySQL
         return;
     }
 
-    new index = s_MigrationRunning;
+    new index = s_MigrationRunning, key[MIGRATION_KEY_LEN];
     s_MigrationRunning = -1;
+    list_get_str(s_MigrationKeys, index, key);
 
-    Log_Warn("migrations", "%s failed with error %d, it gets another go on the next boot", s_MigrationKeys[index], errorid);
+    Log_Warn("migrations", "%s failed with error %d, it gets another go on the next boot", key, errorid);
     s_MigrationFailed++;
 
     Migrations_Step(index + 1);
@@ -251,24 +249,26 @@ forward Boot_Next();
 
 public Boot_Next()
 {
-    new pending = 0;
+    new pending = 0, loader[e_BOOT_LOADER];
 
-    for (new i = 0;i < s_BootLoaderCount;i++)
+    for (new i = 0, count = Boot_CountLoaders();i < count;i++)
     {
-        if (s_BootLoaders[i][E_BOOT_DONE])
+        list_get_arr(s_BootLoaders, i, loader);
+
+        if (loader[E_BOOT_DONE])
         {
             continue;
         }
 
         pending++;
 
-        if (s_BootLoaders[i][E_BOOT_AFTER][0] != EOS && !Boot_IsDone(s_BootLoaders[i][E_BOOT_AFTER]))
+        if (loader[E_BOOT_AFTER][0] != EOS && !Boot_IsDone(loader[E_BOOT_AFTER]))
         {
             continue;
         }
 
         s_BootRunning = i;
-        pawn_call_public(s_BootLoaders[i][E_BOOT_NAME], "");
+        pawn_call_public(loader[E_BOOT_NAME], "");
         return 1;
     }
 

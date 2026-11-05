@@ -10,7 +10,6 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define DOORS_MAX (512)
 #define DOOR_KIND_LEN (12)
 #define DOOR_CALLBACK_LEN (32)
 #define INVALID_DOOR_ID (-1)
@@ -34,9 +33,8 @@ enum
     DOOR_SEARCH_OPEN
 }
 
-enum E_DOOR_DATA
+enum e_DOOR_DATA
 {
-    bool:E_DOOR_USED,
     E_DOOR_KIND[DOOR_KIND_LEN],
     E_DOOR_INDEX,
     Float:E_DOOR_ENTRANCE_X,
@@ -59,8 +57,7 @@ enum E_DOOR_DATA
     Float:E_DOOR_EXIT_ANGLE
 }
 
-static s_Doors[DOORS_MAX][E_DOOR_DATA];
-static s_DoorCount;
+static Pool:s_Doors;
 
 forward Doors_OnExitUnhandled(playerid);
 
@@ -78,14 +75,35 @@ forward Doors_OnExitUnhandled(playerid);
  */
 stock bool:Doors_IsValid(doorid)
 {
-    return doorid >= 0 && doorid < s_DoorCount && s_Doors[doorid][E_DOOR_USED];
+    return doorid >= 0 && pool_valid(s_Doors) && pool_has(s_Doors,doorid);
+}
+
+static bool:Doors_Fetch(doorid,data[e_DOOR_DATA])
+{
+    if (!Doors_IsValid(doorid))
+    {
+        return false;
+    }
+
+    pool_get_arr(s_Doors,doorid,data);
+    return true;
 }
 
 stock Doors_Find(const kind[],index)
 {
-    for (new id = 0;id < s_DoorCount;id++)
+    if (!pool_valid(s_Doors))
     {
-        if (s_Doors[id][E_DOOR_USED] && s_Doors[id][E_DOOR_INDEX] == index && !strcmp(s_Doors[id][E_DOOR_KIND],kind,true))
+        return INVALID_DOOR_ID;
+    }
+
+    new data[e_DOOR_DATA];
+
+    for_pool(it : s_Doors)
+    {
+        new id = iter_get_key(it);
+        pool_get_arr(s_Doors,id,data);
+
+        if (data[E_DOOR_INDEX] == index && !strcmp(data[E_DOOR_KIND],kind,true))
         {
             return id;
         }
@@ -96,14 +114,19 @@ stock Doors_Find(const kind[],index)
 
 stock Doors_FindByLocal(local)
 {
-    if (local == DOOR_NO_LOCAL)
+    if (local == DOOR_NO_LOCAL || !pool_valid(s_Doors))
     {
         return INVALID_DOOR_ID;
     }
 
-    for (new id = 0;id < s_DoorCount;id++)
+    new data[e_DOOR_DATA];
+
+    for_pool(it : s_Doors)
     {
-        if (s_Doors[id][E_DOOR_USED] && s_Doors[id][E_DOOR_LOCAL] == local)
+        new id = iter_get_key(it);
+        pool_get_arr(s_Doors,id,data);
+
+        if (data[E_DOOR_LOCAL] == local)
         {
             return id;
         }
@@ -127,15 +150,19 @@ stock Doors_ResetWorld(playerid)
 
 stock Doors_ApplyWorld(playerid,doorid)
 {
-    if (Util_IsValidPlayer(playerid) && Doors_IsValid(doorid) && s_Doors[doorid][E_DOOR_WORLD] != DOOR_WORLD_KEEP)
+    new data[e_DOOR_DATA];
+
+    if (Util_IsValidPlayer(playerid) && Doors_Fetch(doorid,data) && data[E_DOOR_WORLD] != DOOR_WORLD_KEEP)
     {
-        SetPlayerVirtualWorld(playerid,s_Doors[doorid][E_DOOR_WORLD]);
+        SetPlayerVirtualWorld(playerid,data[E_DOOR_WORLD]);
     }
 }
 
 stock Doors_GetEntrance(doorid,&Float:x,&Float:y,&Float:z)
 {
-    if (!Doors_IsValid(doorid))
+    new data[e_DOOR_DATA];
+
+    if (!Doors_Fetch(doorid,data))
     {
         x = 0.0;
         y = 0.0;
@@ -143,14 +170,16 @@ stock Doors_GetEntrance(doorid,&Float:x,&Float:y,&Float:z)
         return;
     }
 
-    x = s_Doors[doorid][E_DOOR_ENTRANCE_X];
-    y = s_Doors[doorid][E_DOOR_ENTRANCE_Y];
-    z = s_Doors[doorid][E_DOOR_ENTRANCE_Z];
+    x = data[E_DOOR_ENTRANCE_X];
+    y = data[E_DOOR_ENTRANCE_Y];
+    z = data[E_DOOR_ENTRANCE_Z];
 }
 
 stock Doors_GetExit(doorid,&Float:x,&Float:y,&Float:z)
 {
-    if (!Doors_IsValid(doorid))
+    new data[e_DOOR_DATA];
+
+    if (!Doors_Fetch(doorid,data))
     {
         x = 0.0;
         y = 0.0;
@@ -158,9 +187,9 @@ stock Doors_GetExit(doorid,&Float:x,&Float:y,&Float:z)
         return;
     }
 
-    x = s_Doors[doorid][E_DOOR_EXIT_X];
-    y = s_Doors[doorid][E_DOOR_EXIT_Y];
-    z = s_Doors[doorid][E_DOOR_EXIT_Z];
+    x = data[E_DOOR_EXIT_X];
+    y = data[E_DOOR_EXIT_Y];
+    z = data[E_DOOR_EXIT_Z];
 }
 
 static Doors_ValidateCallback(const kind[],index,const callback[])
@@ -173,52 +202,43 @@ static Doors_ValidateCallback(const kind[],index,const callback[])
 
 stock Doors_Register(const kind[],index,Float:entranceX,Float:entranceY,Float:entranceZ,Float:exitX,Float:exitY,Float:exitZ,interior,local,Float:entranceRadius = 3.0,Float:exitRadius = 3.0,flags = DOOR_FLAG_NONE,world = DOOR_WORLD_KEEP,const check[] = "",const enter[] = "",const leave[] = "",const open[] = "",Float:entranceAngle = DOOR_NO_ANGLE,Float:exitAngle = DOOR_NO_ANGLE)
 {
+    if (!pool_valid(s_Doors))
+    {
+        s_Doors = pool_new(-1,true);
+    }
+
+    new data[e_DOOR_DATA];
+    strcopy(data[E_DOOR_KIND],kind,DOOR_KIND_LEN);
+    data[E_DOOR_INDEX] = index;
+    data[E_DOOR_ENTRANCE_X] = entranceX;
+    data[E_DOOR_ENTRANCE_Y] = entranceY;
+    data[E_DOOR_ENTRANCE_Z] = entranceZ;
+    data[E_DOOR_ENTRANCE_RADIUS] = entranceRadius;
+    data[E_DOOR_EXIT_X] = exitX;
+    data[E_DOOR_EXIT_Y] = exitY;
+    data[E_DOOR_EXIT_Z] = exitZ;
+    data[E_DOOR_EXIT_RADIUS] = exitRadius;
+    data[E_DOOR_INTERIOR] = interior;
+    data[E_DOOR_WORLD] = world;
+    data[E_DOOR_LOCAL] = local;
+    data[E_DOOR_FLAGS] = flags;
+    strcopy(data[E_DOOR_CHECK],check,DOOR_CALLBACK_LEN);
+    strcopy(data[E_DOOR_ENTER],enter,DOOR_CALLBACK_LEN);
+    strcopy(data[E_DOOR_LEAVE],leave,DOOR_CALLBACK_LEN);
+    strcopy(data[E_DOOR_OPEN],open,DOOR_CALLBACK_LEN);
+    data[E_DOOR_ENTRANCE_ANGLE] = entranceAngle;
+    data[E_DOOR_EXIT_ANGLE] = exitAngle;
+
     new id = Doors_Find(kind,index);
 
     if (id == INVALID_DOOR_ID)
     {
-        for (new slot = 0;slot < s_DoorCount;slot++)
-        {
-            if (!s_Doors[slot][E_DOOR_USED])
-            {
-                id = slot;
-                break;
-            }
-        }
+        id = pool_add_arr(s_Doors,data);
     }
-
-    if (id == INVALID_DOOR_ID)
+    else
     {
-        if (s_DoorCount >= DOORS_MAX)
-        {
-            Log_Error("doors","no room for door %s %d: raise DOORS_MAX",kind,index);
-            return INVALID_DOOR_ID;
-        }
-
-        id = s_DoorCount++;
+        pool_set_arr(s_Doors,id,data);
     }
-
-    s_Doors[id][E_DOOR_USED] = true;
-    strcopy(s_Doors[id][E_DOOR_KIND],kind,DOOR_KIND_LEN);
-    s_Doors[id][E_DOOR_INDEX] = index;
-    s_Doors[id][E_DOOR_ENTRANCE_X] = entranceX;
-    s_Doors[id][E_DOOR_ENTRANCE_Y] = entranceY;
-    s_Doors[id][E_DOOR_ENTRANCE_Z] = entranceZ;
-    s_Doors[id][E_DOOR_ENTRANCE_RADIUS] = entranceRadius;
-    s_Doors[id][E_DOOR_EXIT_X] = exitX;
-    s_Doors[id][E_DOOR_EXIT_Y] = exitY;
-    s_Doors[id][E_DOOR_EXIT_Z] = exitZ;
-    s_Doors[id][E_DOOR_EXIT_RADIUS] = exitRadius;
-    s_Doors[id][E_DOOR_INTERIOR] = interior;
-    s_Doors[id][E_DOOR_WORLD] = world;
-    s_Doors[id][E_DOOR_LOCAL] = local;
-    s_Doors[id][E_DOOR_FLAGS] = flags;
-    strcopy(s_Doors[id][E_DOOR_CHECK],check,DOOR_CALLBACK_LEN);
-    strcopy(s_Doors[id][E_DOOR_ENTER],enter,DOOR_CALLBACK_LEN);
-    strcopy(s_Doors[id][E_DOOR_LEAVE],leave,DOOR_CALLBACK_LEN);
-    strcopy(s_Doors[id][E_DOOR_OPEN],open,DOOR_CALLBACK_LEN);
-    s_Doors[id][E_DOOR_ENTRANCE_ANGLE] = entranceAngle;
-    s_Doors[id][E_DOOR_EXIT_ANGLE] = exitAngle;
 
     Doors_ValidateCallback(kind,index,check);
     Doors_ValidateCallback(kind,index,enter);
@@ -234,7 +254,7 @@ stock bool:Doors_Remove(doorid)
         return false;
     }
 
-    s_Doors[doorid][E_DOOR_USED] = false;
+    pool_remove(s_Doors,doorid);
     return true;
 }
 
@@ -252,7 +272,7 @@ static Float:Doors_CubeDistance(Float:playerX,Float:playerY,Float:playerZ,Float:
 
 stock Doors_FindNearest(playerid,searchMode)
 {
-    if (!Util_IsValidPlayer(playerid))
+    if (!Util_IsValidPlayer(playerid) || !pool_valid(s_Doors))
     {
         return INVALID_DOOR_ID;
     }
@@ -260,29 +280,27 @@ stock Doors_FindNearest(playerid,searchMode)
     new Float:playerX, Float:playerY, Float:playerZ;
     GetPlayerPos(playerid,playerX,playerY,playerZ);
 
-    new best = INVALID_DOOR_ID, Float:bestDistance = -1.0;
+    new best = INVALID_DOOR_ID, Float:bestDistance = -1.0, data[e_DOOR_DATA];
 
-    for (new id = 0;id < s_DoorCount;id++)
+    for_pool(it : s_Doors)
     {
-        if (!s_Doors[id][E_DOOR_USED])
-        {
-            continue;
-        }
+        new id = iter_get_key(it);
+        pool_get_arr(s_Doors,id,data);
 
-        new bool:hasInterior = !(s_Doors[id][E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR);
+        new bool:hasInterior = !(data[E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR);
         new Float:entranceDistance = -1.0, Float:exitDistance = -1.0;
 
         if (searchMode != DOOR_SEARCH_EXIT)
         {
-            entranceDistance = Doors_CubeDistance(playerX,playerY,playerZ,s_Doors[id][E_DOOR_ENTRANCE_RADIUS],s_Doors[id][E_DOOR_ENTRANCE_X],s_Doors[id][E_DOOR_ENTRANCE_Y],s_Doors[id][E_DOOR_ENTRANCE_Z]);
+            entranceDistance = Doors_CubeDistance(playerX,playerY,playerZ,data[E_DOOR_ENTRANCE_RADIUS],data[E_DOOR_ENTRANCE_X],data[E_DOOR_ENTRANCE_Y],data[E_DOOR_ENTRANCE_Z]);
         }
 
         if (searchMode != DOOR_SEARCH_ENTRANCE && hasInterior)
         {
-            exitDistance = Doors_CubeDistance(playerX,playerY,playerZ,s_Doors[id][E_DOOR_EXIT_RADIUS],s_Doors[id][E_DOOR_EXIT_X],s_Doors[id][E_DOOR_EXIT_Y],s_Doors[id][E_DOOR_EXIT_Z]);
+            exitDistance = Doors_CubeDistance(playerX,playerY,playerZ,data[E_DOOR_EXIT_RADIUS],data[E_DOOR_EXIT_X],data[E_DOOR_EXIT_Y],data[E_DOOR_EXIT_Z]);
         }
 
-        if (searchMode == DOOR_SEARCH_OPEN && s_Doors[id][E_DOOR_OPEN][0] == EOS)
+        if (searchMode == DOOR_SEARCH_OPEN && data[E_DOOR_OPEN][0] == EOS)
         {
             continue;
         }
@@ -316,14 +334,14 @@ static Doors_FindOwn(playerid,searchMode)
         return INVALID_DOOR_ID;
     }
 
-    new id = Doors_FindByLocal(Account_GetLocal(playerid));
+    new id = Doors_FindByLocal(Account_GetLocal(playerid)), data[e_DOOR_DATA];
 
-    if (id == INVALID_DOOR_ID || (s_Doors[id][E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR))
+    if (!Doors_Fetch(id,data) || (data[E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR))
     {
         return INVALID_DOOR_ID;
     }
 
-    if (searchMode == DOOR_SEARCH_OPEN && s_Doors[id][E_DOOR_OPEN][0] == EOS)
+    if (searchMode == DOOR_SEARCH_OPEN && data[E_DOOR_OPEN][0] == EOS)
     {
         return INVALID_DOOR_ID;
     }
@@ -331,7 +349,7 @@ static Doors_FindOwn(playerid,searchMode)
     new Float:playerX, Float:playerY, Float:playerZ;
     GetPlayerPos(playerid,playerX,playerY,playerZ);
 
-    if (Doors_CubeDistance(playerX,playerY,playerZ,s_Doors[id][E_DOOR_EXIT_RADIUS],s_Doors[id][E_DOOR_EXIT_X],s_Doors[id][E_DOOR_EXIT_Y],s_Doors[id][E_DOOR_EXIT_Z]) < 0.0)
+    if (Doors_CubeDistance(playerX,playerY,playerZ,data[E_DOOR_EXIT_RADIUS],data[E_DOOR_EXIT_X],data[E_DOOR_EXIT_Y],data[E_DOOR_EXIT_Z]) < 0.0)
     {
         return INVALID_DOOR_ID;
     }
@@ -358,30 +376,32 @@ stock Doors_FindOpenable(playerid)
 
 stock bool:Doors_Place(playerid,doorid)
 {
-    if (!Util_IsValidPlayer(playerid) || !Doors_IsValid(doorid) || (s_Doors[doorid][E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR))
+    new data[e_DOOR_DATA];
+
+    if (!Util_IsValidPlayer(playerid) || !Doors_Fetch(doorid,data) || (data[E_DOOR_FLAGS] & DOOR_FLAG_NO_INTERIOR))
     {
         return false;
     }
 
-    SetPlayerInterior(playerid,s_Doors[doorid][E_DOOR_INTERIOR]);
+    SetPlayerInterior(playerid,data[E_DOOR_INTERIOR]);
 
-    if (s_Doors[doorid][E_DOOR_WORLD] != DOOR_WORLD_KEEP)
+    if (data[E_DOOR_WORLD] != DOOR_WORLD_KEEP)
     {
-        SetPlayerVirtualWorld(playerid,s_Doors[doorid][E_DOOR_WORLD]);
+        SetPlayerVirtualWorld(playerid,data[E_DOOR_WORLD]);
     }
 
-    SetPlayerPos(playerid,s_Doors[doorid][E_DOOR_EXIT_X],s_Doors[doorid][E_DOOR_EXIT_Y],s_Doors[doorid][E_DOOR_EXIT_Z]);
+    SetPlayerPos(playerid,data[E_DOOR_EXIT_X],data[E_DOOR_EXIT_Y],data[E_DOOR_EXIT_Z]);
 
-    if (s_Doors[doorid][E_DOOR_EXIT_ANGLE] != DOOR_NO_ANGLE)
+    if (data[E_DOOR_EXIT_ANGLE] != DOOR_NO_ANGLE)
     {
-        SetPlayerFacingAngle(playerid,s_Doors[doorid][E_DOOR_EXIT_ANGLE]);
+        SetPlayerFacingAngle(playerid,data[E_DOOR_EXIT_ANGLE]);
     }
 
-    Account_SetInterior(playerid,s_Doors[doorid][E_DOOR_INTERIOR]);
+    Account_SetInterior(playerid,data[E_DOOR_INTERIOR]);
 
-    if (s_Doors[doorid][E_DOOR_LOCAL] != DOOR_NO_LOCAL)
+    if (data[E_DOOR_LOCAL] != DOOR_NO_LOCAL)
     {
-        Account_SetLocal(playerid,s_Doors[doorid][E_DOOR_LOCAL]);
+        Account_SetLocal(playerid,data[E_DOOR_LOCAL]);
     }
 
     return true;
@@ -389,21 +409,23 @@ stock bool:Doors_Place(playerid,doorid)
 
 stock bool:Doors_Enter(playerid,doorid,bool:force = false)
 {
-    if (!Util_IsValidPlayer(playerid) || !Doors_IsValid(doorid))
+    new data[e_DOOR_DATA];
+
+    if (!Util_IsValidPlayer(playerid) || !Doors_Fetch(doorid,data))
     {
         return false;
     }
 
-    if (!force && s_Doors[doorid][E_DOOR_CHECK][0] != EOS && CallLocalFunction(s_Doors[doorid][E_DOOR_CHECK],"ddd",playerid,doorid,s_Doors[doorid][E_DOOR_INDEX]) == 0)
+    if (!force && data[E_DOOR_CHECK][0] != EOS && CallLocalFunction(data[E_DOOR_CHECK],"ddd",playerid,doorid,data[E_DOOR_INDEX]) == 0)
     {
         return false;
     }
 
     Doors_Place(playerid,doorid);
 
-    if (s_Doors[doorid][E_DOOR_ENTER][0] != EOS)
+    if (data[E_DOOR_ENTER][0] != EOS)
     {
-        CallLocalFunction(s_Doors[doorid][E_DOOR_ENTER],"ddd",playerid,doorid,s_Doors[doorid][E_DOOR_INDEX]);
+        CallLocalFunction(data[E_DOOR_ENTER],"ddd",playerid,doorid,data[E_DOOR_INDEX]);
     }
 
     return true;
@@ -411,35 +433,37 @@ stock bool:Doors_Enter(playerid,doorid,bool:force = false)
 
 stock bool:Doors_Leave(playerid,doorid)
 {
-    if (!Util_IsValidPlayer(playerid) || !Doors_IsValid(doorid))
+    new data[e_DOOR_DATA];
+
+    if (!Util_IsValidPlayer(playerid) || !Doors_Fetch(doorid,data))
     {
         return false;
     }
 
     SetPlayerInterior(playerid,0);
 
-    if (s_Doors[doorid][E_DOOR_WORLD] != DOOR_WORLD_KEEP)
+    if (data[E_DOOR_WORLD] != DOOR_WORLD_KEEP)
     {
         SetPlayerVirtualWorld(playerid,0);
     }
 
-    SetPlayerPos(playerid,s_Doors[doorid][E_DOOR_ENTRANCE_X],s_Doors[doorid][E_DOOR_ENTRANCE_Y],s_Doors[doorid][E_DOOR_ENTRANCE_Z]);
+    SetPlayerPos(playerid,data[E_DOOR_ENTRANCE_X],data[E_DOOR_ENTRANCE_Y],data[E_DOOR_ENTRANCE_Z]);
 
-    if (s_Doors[doorid][E_DOOR_ENTRANCE_ANGLE] != DOOR_NO_ANGLE)
+    if (data[E_DOOR_ENTRANCE_ANGLE] != DOOR_NO_ANGLE)
     {
-        SetPlayerFacingAngle(playerid,s_Doors[doorid][E_DOOR_ENTRANCE_ANGLE]);
+        SetPlayerFacingAngle(playerid,data[E_DOOR_ENTRANCE_ANGLE]);
     }
 
     Account_SetInterior(playerid,0);
 
-    if (s_Doors[doorid][E_DOOR_LOCAL] != DOOR_NO_LOCAL)
+    if (data[E_DOOR_LOCAL] != DOOR_NO_LOCAL)
     {
         Account_SetLocal(playerid,DOOR_LOCAL_OUTSIDE);
     }
 
-    if (s_Doors[doorid][E_DOOR_LEAVE][0] != EOS)
+    if (data[E_DOOR_LEAVE][0] != EOS)
     {
-        CallLocalFunction(s_Doors[doorid][E_DOOR_LEAVE],"ddd",playerid,doorid,s_Doors[doorid][E_DOOR_INDEX]);
+        CallLocalFunction(data[E_DOOR_LEAVE],"ddd",playerid,doorid,data[E_DOOR_INDEX]);
     }
 
     return true;
@@ -447,12 +471,14 @@ stock bool:Doors_Leave(playerid,doorid)
 
 stock bool:Doors_Open(playerid,doorid)
 {
-    if (!Util_IsValidPlayer(playerid) || !Doors_IsValid(doorid) || s_Doors[doorid][E_DOOR_OPEN][0] == EOS)
+    new data[e_DOOR_DATA];
+
+    if (!Util_IsValidPlayer(playerid) || !Doors_Fetch(doorid,data) || data[E_DOOR_OPEN][0] == EOS)
     {
         return false;
     }
 
-    CallLocalFunction(s_Doors[doorid][E_DOOR_OPEN],"ddd",playerid,doorid,s_Doors[doorid][E_DOOR_INDEX]);
+    CallLocalFunction(data[E_DOOR_OPEN],"ddd",playerid,doorid,data[E_DOOR_INDEX]);
     return true;
 }
 

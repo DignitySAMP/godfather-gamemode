@@ -10,14 +10,11 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define SELL_MAX (8)
 #define SELL_NAME_LEN (16)
 #define SELL_CALLBACK_LEN (32)
 #define SELL_REST_LEN (128)
 
-static s_SellNames[SELL_MAX][SELL_NAME_LEN];
-static s_SellCallbacks[SELL_MAX][SELL_CALLBACK_LEN];
-static s_SellCount;
+static Map:s_SellOptions;
 
 forward Fishing_SellFish(playerid,const params[]);
 
@@ -33,6 +30,38 @@ forward Fishing_SellFish(playerid,const params[]);
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static bool:Sell_Key(const name[],dest[SELL_NAME_LEN])
+{
+    if (name[0] == EOS || strlen(name) >= SELL_NAME_LEN)
+    {
+        dest[0] = EOS;
+        return false;
+    }
+
+    strcopy(dest,name,SELL_NAME_LEN);
+
+    for (new i = 0;dest[i] != EOS;i++)
+    {
+        dest[i] = tolower(dest[i]);
+    }
+
+    return true;
+}
+
+static bool:Sell_Find(const name[],dest[],size = sizeof(dest))
+{
+    new key[SELL_NAME_LEN];
+    dest[0] = EOS;
+
+    if (!map_valid(s_SellOptions) || !Sell_Key(name,key) || !map_has_str_key(s_SellOptions,key))
+    {
+        return false;
+    }
+
+    map_str_get_str(s_SellOptions,key,dest,size);
+    return true;
+}
+
 stock bool:Sell_Register(const name[],const callback[])
 {
     if (name[0] == EOS || strlen(name) >= SELL_NAME_LEN)
@@ -46,39 +75,31 @@ stock bool:Sell_Register(const name[],const callback[])
         return false;
     }
 
-    for (new i = 0;i < s_SellCount;i++)
+    new key[SELL_NAME_LEN], stored[SELL_CALLBACK_LEN];
+    Sell_Key(name,key);
+    strcopy(stored,callback,SELL_CALLBACK_LEN);
+
+    if (!map_valid(s_SellOptions))
     {
-        if (!strcmp(s_SellNames[i],name,true))
-        {
-            strcopy(s_SellCallbacks[i],callback,SELL_CALLBACK_LEN);
-            return true;
-        }
+        s_SellOptions = map_new();
     }
 
-    if (s_SellCount >= SELL_MAX)
-    {
-        Log_Error("fishing","no room for sell option %s: raise SELL_MAX",name);
-        return false;
-    }
-
-    strcopy(s_SellNames[s_SellCount],name,SELL_NAME_LEN);
-    strcopy(s_SellCallbacks[s_SellCount],callback,SELL_CALLBACK_LEN);
-    s_SellCount++;
+    map_str_remove(s_SellOptions,key);
+    map_str_add_str(s_SellOptions,key,stored);
     return true;
 }
 
 static bool:Sell_Run(playerid,const name[],const rest[])
 {
-    for (new i = 0;i < s_SellCount;i++)
+    new callback[SELL_CALLBACK_LEN];
+
+    if (!Sell_Find(name,callback))
     {
-        if (!strcmp(s_SellNames[i],name,true))
-        {
-            pawn_call_public(s_SellCallbacks[i],"ds",playerid,rest);
-            return true;
-        }
+        return false;
     }
 
-    return false;
+    pawn_call_public(callback,"ds",playerid,rest);
+    return true;
 }
 
 /**

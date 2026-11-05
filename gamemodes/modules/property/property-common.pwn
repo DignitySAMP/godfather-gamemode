@@ -10,9 +10,12 @@
  *      \$$$$$$$  \$$$$$$$   \$$$$   \$$$$$$$
  *
  */
-#define PROPERTY_WORLD_HOUSE_BASE (10000)
-#define PROPERTY_WORLD_BUSINESS_BASE (20000)
-#define PROPERTY_WORLD_LIMIT (30000)
+#define PROPERTY_WORLD_HOUSE_BASE (100000000)
+#define PROPERTY_WORLD_BUSINESS_BASE (200000000)
+#define PROPERTY_WORLD_LIMIT (300000000)
+#define PROPERTY_LOCAL_HOUSE_BASE (100000000)
+#define PROPERTY_LOCAL_BUSINESS_BASE (200000000)
+#define PROPERTY_LOCAL_SADOOR_BASE (300000000)
 
 /**
  *      ______                                   __      __

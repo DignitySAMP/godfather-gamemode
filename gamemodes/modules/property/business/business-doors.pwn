@@ -61,7 +61,7 @@ stock Business_RegisterTypedDoor(key)
     new Float:entranceX, Float:entranceY, Float:entranceZ, Float:exitX, Float:exitY, Float:exitZ;
     Business_GetEntrance(key,entranceX,entranceY,entranceZ);
     Business_GetExit(key,exitX,exitY,exitZ);
-    return Doors_Register(DOOR_KIND_TBIZ,key - BUSINESS_TYPED_BASE,entranceX,entranceY,entranceZ,exitX,exitY,exitZ,Business_GetInterior(key),key,BUSINESS_RADIUS,BUSINESS_RADIUS,DOOR_FLAG_NONE,PROPERTY_WORLD_BUSINESS_BASE + key,"Business_TypedCheck","Business_TypedEntered","","Business_TypedOpened",Business_GetEntranceAngle(key),Business_GetExitAngle(key));
+    return Doors_Register(DOOR_KIND_TBIZ,key - BUSINESS_TYPED_BASE,entranceX,entranceY,entranceZ,exitX,exitY,exitZ,Business_GetInterior(key),Business_GetTypedLocal(key),BUSINESS_RADIUS,BUSINESS_RADIUS,DOOR_FLAG_NONE,PROPERTY_WORLD_BUSINESS_BASE + key,"Business_TypedCheck","Business_TypedEntered","","Business_TypedOpened",Business_GetEntranceAngle(key),Business_GetExitAngle(key));
 }
 
 stock Business_RegisterDoors()
@@ -79,7 +79,7 @@ stock Business_RegisterDoors()
         Doors_Register(DOOR_KIND_BIZ,index,entranceX,entranceY,entranceZ,exitX,exitY,exitZ,Business_GetInterior(index),index + DOOR_LOCAL_BIZ_BASE,BUSINESS_RADIUS,BUSINESS_RADIUS,DOOR_FLAG_NONE,PROPERTY_WORLD_BUSINESS_BASE + index,"Business_DoorCheck","Business_DoorEntered","","Business_DoorOpened");
     }
 
-    for (new row = BUSINESS_FIXED_ROWS;row < BUSINESS_ROWS;row++)
+    for (new row = BUSINESS_FIXED_ROWS, rows = Business_GetRowCount();row < rows;row++)
     {
         Business_RegisterTypedDoor(Business_GetKeyOfRow(row));
     }

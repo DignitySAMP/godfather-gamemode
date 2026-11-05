@@ -12,8 +12,6 @@
  */
 #define COMMANDS_NAME_LEN (32)
 
-#define COMMAND_SECRET_MAX (8)
-#define COMMAND_DENIAL_MAX (96)
 #define COMMAND_DENIAL_TEXT_LEN (96)
 #define COMMAND_REPLY_NOT_LOGGED_IN "   You haven't logged in yet !"
 #define COMMAND_REPLY_NOT_AUTHORIZED "   you are not authorized to use that command!"
@@ -27,13 +25,14 @@ enum E_COMMAND_DENIAL
 forward bool:Player_IsReady(playerid);
 forward Account_GetAdminLevel(playerid);
 
-static s_CommandDenialName[COMMAND_DENIAL_MAX][COMMANDS_NAME_LEN];
-static E_COMMAND_DENIAL:s_CommandDenialKind[COMMAND_DENIAL_MAX];
-static s_CommandDenialColour[COMMAND_DENIAL_MAX];
-static s_CommandDenialText[COMMAND_DENIAL_MAX][COMMAND_DENIAL_TEXT_LEN];
-static s_CommandDenialCount;
-static s_CommandSecretName[COMMAND_SECRET_MAX][COMMANDS_NAME_LEN];
-static s_CommandSecretCount;
+enum e_COMMAND_REPLY
+{
+    E_COMMAND_REPLY_COLOUR,
+    E_COMMAND_REPLY_TEXT[COMMAND_DENIAL_TEXT_LEN]
+}
+
+static Map:s_CommandDenials[E_COMMAND_DENIAL];
+static Map:s_CommandSecrets;
 
 /**
  *      ______                                   __      __
@@ -47,42 +46,44 @@ static s_CommandSecretCount;
  *     \$$        \$$$$$$  \$$   \$$  \$$$$$$$    \$$$$  \$$  \$$$$$$  \$$   \$$ \$$$$$$$
  *
  */
+static Command_Key(const name[],dest[COMMANDS_NAME_LEN])
+{
+    strcopy(dest,name,COMMANDS_NAME_LEN);
+
+    for (new i = 0;dest[i] != EOS;i++)
+    {
+        dest[i] = tolower(dest[i]);
+    }
+}
+
 stock Command_SetDenial(const name[],E_COMMAND_DENIAL:kind,colour,const text[])
 {
-    for (new i = 0;i < s_CommandDenialCount;i++)
+    new key[COMMANDS_NAME_LEN], reply[e_COMMAND_REPLY];
+    Command_Key(name,key);
+    reply[E_COMMAND_REPLY_COLOUR] = colour;
+    strcopy(reply[E_COMMAND_REPLY_TEXT],text,COMMAND_DENIAL_TEXT_LEN);
+
+    if (!map_valid(s_CommandDenials[kind]))
     {
-        if (s_CommandDenialKind[i] == kind && !strcmp(s_CommandDenialName[i],name,true))
-        {
-            s_CommandDenialColour[i] = colour;
-            strcopy(s_CommandDenialText[i],text,COMMAND_DENIAL_TEXT_LEN);
-            return true;
-        }
+        s_CommandDenials[kind] = map_new();
     }
 
-    if (s_CommandDenialCount >= COMMAND_DENIAL_MAX)
-    {
-        Log_Error("commands","denial table full - '%s' keeps the default text",name);
-        return false;
-    }
-
-    strcopy(s_CommandDenialName[s_CommandDenialCount],name,COMMANDS_NAME_LEN);
-    s_CommandDenialKind[s_CommandDenialCount] = kind;
-    s_CommandDenialColour[s_CommandDenialCount] = colour;
-    strcopy(s_CommandDenialText[s_CommandDenialCount],text,COMMAND_DENIAL_TEXT_LEN);
-    s_CommandDenialCount++;
+    map_str_remove(s_CommandDenials[kind],key);
+    map_str_add_arr(s_CommandDenials[kind],key,reply);
     return true;
 }
 
 stock bool:Command_SetSecret(const name[])
 {
-    if (s_CommandSecretCount >= COMMAND_SECRET_MAX)
+    new key[COMMANDS_NAME_LEN];
+    Command_Key(name,key);
+
+    if (!map_valid(s_CommandSecrets))
     {
-        Log_Error("commands","secret table full - '%s' would be logged in clear",name);
-        return false;
+        s_CommandSecrets = map_new();
     }
 
-    strcopy(s_CommandSecretName[s_CommandSecretCount],name,COMMANDS_NAME_LEN);
-    s_CommandSecretCount++;
+    map_str_add(s_CommandSecrets,key,1);
     return true;
 }
 
@@ -103,13 +104,15 @@ static Command_Deny(playerid,cmdid,E_COMMAND_DENIAL:kind)
     new name[COMMANDS_NAME_LEN], pointing = GetPointingCommandID(cmdid);
     GetCommandName(pointing != INVALID_COMMAND_ID ? pointing : cmdid,name);
 
-    for (new i = 0;i < s_CommandDenialCount;i++)
+    new key[COMMANDS_NAME_LEN];
+    Command_Key(name,key);
+
+    if (map_valid(s_CommandDenials[kind]) && map_has_str_key(s_CommandDenials[kind],key))
     {
-        if (s_CommandDenialKind[i] == kind && !strcmp(s_CommandDenialName[i],name,true))
-        {
-            SendClientMessage(playerid,s_CommandDenialColour[i],s_CommandDenialText[i]);
-            return;
-        }
+        new reply[e_COMMAND_REPLY];
+        map_str_get_arr(s_CommandDenials[kind],key,reply);
+        SendClientMessage(playerid,reply[E_COMMAND_REPLY_COLOUR],reply[E_COMMAND_REPLY_TEXT]);
+        return;
     }
 
     if (kind == E_COMMAND_DENIAL_LOGIN)

@@ -13,9 +13,7 @@
 #define PLAYER_LOADERS_MAX (31)
 #define PLAYER_LOADER_NAME_LEN (32)
 
-static s_PlayerLoaderNames[PLAYER_LOADERS_MAX][PLAYER_LOADER_NAME_LEN];
-static bool:s_PlayerLoaderActive[PLAYER_LOADERS_MAX];
-static s_PlayerLoaderCount;
+static Pool:s_PlayerLoaders;
 
 static s_PlayerLoadDone[MAX_PLAYERS];
 static s_PlayerLoadToken[MAX_PLAYERS];
@@ -38,11 +36,21 @@ static s_PlayerNextToken;
  */
 stock Player_FindLoader(const name[])
 {
-    for (new i = 0;i < s_PlayerLoaderCount;i++)
+    if (!pool_valid(s_PlayerLoaders))
     {
-        if (s_PlayerLoaderActive[i] && !strcmp(s_PlayerLoaderNames[i],name,true))
+        return -1;
+    }
+
+    new loader[PLAYER_LOADER_NAME_LEN];
+
+    for_pool(it : s_PlayerLoaders)
+    {
+        new slot = iter_get_key(it);
+        pool_get_str(s_PlayerLoaders,slot,loader);
+
+        if (!strcmp(loader,name,true))
         {
-            return i;
+            return slot;
         }
     }
 
@@ -53,11 +61,11 @@ stock Player_GetFullMask()
 {
     new mask = 0;
 
-    for (new i = 0;i < s_PlayerLoaderCount;i++)
+    if (pool_valid(s_PlayerLoaders))
     {
-        if (s_PlayerLoaderActive[i])
+        for_pool(it : s_PlayerLoaders)
         {
-            mask |= (1 << i);
+            mask |= (1 << iter_get_key(it));
         }
     }
 
@@ -71,30 +79,23 @@ stock bool:Player_RegisterLoader(const name[])
         return true;
     }
 
-    new slot = -1;
-
-    for (new i = 0;i < s_PlayerLoaderCount;i++)
+    if (!pool_valid(s_PlayerLoaders))
     {
-        if (!s_PlayerLoaderActive[i])
-        {
-            slot = i;
-            break;
-        }
+        s_PlayerLoaders = pool_new(-1,true);
     }
 
-    if (slot == -1)
-    {
-        if (s_PlayerLoaderCount >= PLAYER_LOADERS_MAX)
-        {
-            Log_Error("player","no room for loader %s: raise PLAYER_LOADERS_MAX, players would never become ready",name);
-            return false;
-        }
+    new loader[PLAYER_LOADER_NAME_LEN];
+    strcopy(loader,name,PLAYER_LOADER_NAME_LEN);
 
-        slot = s_PlayerLoaderCount++;
+    new slot = pool_add_str(s_PlayerLoaders,loader);
+
+    if (slot >= PLAYER_LOADERS_MAX)
+    {
+        pool_remove(s_PlayerLoaders,slot);
+        Log_Error("player","no room for loader %s: raise PLAYER_LOADERS_MAX, players would never become ready",name);
+        return false;
     }
 
-    strcopy(s_PlayerLoaderNames[slot],name,PLAYER_LOADER_NAME_LEN);
-    s_PlayerLoaderActive[slot] = true;
     return true;
 }
 

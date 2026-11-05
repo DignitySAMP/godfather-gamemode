@@ -228,7 +228,7 @@ CMD<ADMIN_LEVEL_MANAGER>:movehouse(cmdid, playerid, params[])
         return 1;
     }
 
-    if (!Create_ReadNumber(token,house,0,HOUSES_MAX) || !Houses_IsValid(house))
+    if (!Create_ReadNumber(token,house,0,cellmax) || !Houses_IsValid(house))
     {
         SendClientMessage(playerid,COLOR_GRAD2,"   That house does not exist.");
         return 1;
@@ -262,7 +262,7 @@ CMD<ADMIN_LEVEL_MANAGER>:movebiz(cmdid, playerid, params[])
         return 1;
     }
 
-    if (!Create_ReadNumber(token,key,0,BUSINESS_TYPED_BASE + BUSINESS_TYPED_MAX) || !Business_IsValid(key))
+    if (!Create_ReadNumber(token,key,0,cellmax) || !Business_IsValid(key))
     {
         SendClientMessage(playerid,COLOR_GRAD2,"   That business does not exist.");
         return 1;
@@ -301,7 +301,7 @@ CMD<ADMIN_LEVEL_MANAGER>:deletehouse(cmdid, playerid, params[])
         return 1;
     }
 
-    if (!Create_ReadNumber(token,house,0,HOUSES_MAX))
+    if (!Create_ReadNumber(token,house,0,cellmax))
     {
         house = HOUSE_NO_KEY;
     }
@@ -343,7 +343,7 @@ CMD<ADMIN_LEVEL_MANAGER>:deletebiz(cmdid, playerid, params[])
         return 1;
     }
 
-    if (!Create_ReadNumber(token,key,0,BUSINESS_TYPED_BASE + BUSINESS_TYPED_MAX))
+    if (!Create_ReadNumber(token,key,0,cellmax))
     {
         key = BUSINESS_NO_KEY;
     }

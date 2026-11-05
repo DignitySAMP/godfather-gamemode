@@ -165,7 +165,7 @@ CMD:buybiz(cmdid, playerid, params[])
         return 1;
     }
 
-    for (new row = BUSINESS_FIXED_ROWS;row < BUSINESS_ROWS;row++)
+    for (new row = BUSINESS_FIXED_ROWS, rows = Business_GetRowCount();row < rows;row++)
     {
         new key = Business_GetKeyOfRow(row);
 
